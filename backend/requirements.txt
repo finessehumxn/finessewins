@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+langgraph
+langchain-anthropic
+langchain-core
+httpx
+pydantic
+python-dotenv
+python-multipart
+# ── added in v1.1 ──
+supabase            # Postgres persistence + auth admin
+PyJWT               # verify Supabase Auth JWTs
+python-docx         # DOCX proposal export
+stripe              # subscription billing
+beautifulsoup4      # live scraping (AZ APP Portal, FedConnect)
+lxml                # fast HTML parser for BeautifulSoup

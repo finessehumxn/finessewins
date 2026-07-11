@@ -1,0 +1,70 @@
+# FinesseWins — one-click infra for Render (render.com).
+# Backend API + static frontend. Set the secret env vars in the Render dashboard
+# (marked sync:false) — never commit real keys. See DEPLOY.md for the full runbook.
+
+services:
+  # ── Backend API ────────────────────────────────────────────────
+  - type: web
+    name: finessewins-api
+    runtime: python
+    rootDir: backend
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5
+      - key: SAM_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FINESSEWINS_FROM_EMAIL
+        value: FinesseWins <alerts@finessewins.com>
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_SOLO_PRICE_ID
+        sync: false
+      - key: STRIPE_PRO_PRICE_ID
+        sync: false
+      - key: STRIPE_AGENCY_PRICE_ID
+        sync: false
+      - key: STRIPE_ORG_PRICE_ID
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://finessewins.com,https://app.finessewins.com
+      - key: FINESSEWINS_APP_URL
+        value: https://app.finessewins.com
+      - key: FINESSEWINS_HIDE_SAMPLE
+        value: "1"
+      - key: RATE_LIMIT_DISABLED
+        value: "0"
+
+  # ── Frontend (static Vite build) ───────────────────────────────
+  - type: web
+    name: finessewins-app
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_API_URL
+        value: https://finessewins-api.onrender.com

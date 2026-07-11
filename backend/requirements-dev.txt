@@ -1,0 +1,3 @@
+# Dev/test-only deps. Runtime deps are in requirements.txt.
+-r requirements.txt
+pytest
