@@ -13,6 +13,7 @@ export default function Alerts({ onNavigate }) {
   const [matches, setMatches] = useState([])
   const [unseen, setUnseen] = useState(0)
   const [newCode, setNewCode] = useState("")
+  const [results, setResults] = useState([])       // live search matches
   const [scores, setScores] = useState({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -49,13 +50,27 @@ export default function Alerts({ onNavigate }) {
     return () => { alive = false }
   }, [])
 
-  const addCode = (code) => {
+  // Live NAICS search — type "cleaning", "trucking", "catering", or a code.
+  useEffect(() => {
+    const q = newCode.trim()
+    if (q.length < 2) { setResults([]); return }
+    let alive = true
+    const t = setTimeout(async () => {
+      try {
+        const r = await apiJson(`/api/naics/suggestions?q=${encodeURIComponent(q)}`)
+        if (alive) setResults((r.suggestions || []).filter(s => !codes.some(c => c.code === s.code)))
+      } catch { if (alive) setResults([]) }
+    }, 180)
+    return () => { alive = false; clearTimeout(t) }
+  }, [newCode, codes])
+
+  const addCode = (code, name) => {
     const c = String(code || "").trim()
-    if (!/^\d{2,6}$/.test(c)) { setError("Enter a valid NAICS code (2–6 digits)."); return }
-    if (codes.some(x => x.code === c)) { setNewCode(""); return }
-    const match = suggestions.find(s => s.code === c)
-    setCodes([...codes, { code: c, name: match?.name || null }])
-    setNewCode("")
+    if (!/^\d{2,6}$/.test(c)) { setError('Search by what you do (e.g. "cleaning") and tap a match, or enter a NAICS code.'); return }
+    if (codes.some(x => x.code === c)) { setNewCode(""); setResults([]); return }
+    const label = name || suggestions.find(s => s.code === c)?.name || results.find(s => s.code === c)?.name || null
+    setCodes([...codes, { code: c, name: label }])
+    setNewCode(""); setResults([])
     setError(null)
   }
 
@@ -173,15 +188,36 @@ export default function Alerts({ onNavigate }) {
           </div>
         )}
 
-        {/* Add code */}
-        <div style={{ display: "flex", gap: ".6rem", marginBottom: "1rem" }}>
-          <input value={newCode} onChange={e => setNewCode(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addCode(newCode)}
-            placeholder="Add a NAICS code, e.g. 541512" style={{ ...input, maxWidth: 280 }} />
-          <button onClick={() => addCode(newCode)}
-            style={{ background: "#EC1C7B", color: "#fff", border: "none", padding: ".7rem 1.25rem", fontFamily: "'DM Mono', monospace", fontSize: ".65rem", letterSpacing: ".1em", textTransform: "uppercase", cursor: "pointer", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>
-            + Add
-          </button>
+        {/* Add code — search by trade OR type a code */}
+        <div style={{ position: "relative", marginBottom: "1rem" }}>
+          <div style={{ display: "flex", gap: ".6rem" }}>
+            <input value={newCode} onChange={e => setNewCode(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") { const top = results[0]; top ? addCode(top.code, top.name) : addCode(newCode) }
+                if (e.key === "Escape") setResults([])
+              }}
+              placeholder='Search your trade — "cleaning", "trucking", "catering"… or a code'
+              style={{ ...input, flex: 1 }} />
+            <button onClick={() => { const top = results[0]; top ? addCode(top.code, top.name) : addCode(newCode) }}
+              style={{ background: "#EC1C7B", color: "#fff", border: "none", padding: ".7rem 1.25rem", fontFamily: "'DM Mono', monospace", fontSize: ".65rem", letterSpacing: ".1em", textTransform: "uppercase", cursor: "pointer", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>
+              + Add
+            </button>
+          </div>
+
+          {/* Live results dropdown */}
+          {results.length > 0 && (
+            <div style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: ".4rem", background: "#140e18", border: "1px solid rgba(255,255,255,.14)", borderRadius: 10, boxShadow: "0 12px 32px rgba(0,0,0,.5)", zIndex: 20, overflow: "hidden", maxHeight: 320, overflowY: "auto" }}>
+              {results.map((s, i) => (
+                <button key={s.code} onClick={() => addCode(s.code, s.name)}
+                  style={{ display: "flex", alignItems: "center", gap: ".7rem", width: "100%", textAlign: "left", background: "none", border: "none", borderTop: i ? "1px solid rgba(255,255,255,.06)" : "none", color: "#fff", padding: ".65rem .9rem", cursor: "pointer", fontFamily: "'Space Grotesk', sans-serif", fontSize: ".85rem" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(236,28,123,.12)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "none"}>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: ".72rem", fontWeight: 700, color: "#EC1C7B", minWidth: 52 }}>{s.code}</span>
+                  <span style={{ color: "rgba(255,255,255,.85)" }}>{s.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Suggestions */}

@@ -35,6 +35,29 @@ def test_naics_name_exact_and_sector():
     assert naics_data.naics_name(None) is None
 
 
+def test_naics_search_by_trade_and_code():
+    def top(q):
+        r = naics_data.search(q)
+        return r[0]["code"] if r else None
+    # plain-word trade searches (what a first-time bidder actually types)
+    assert top("cleaning") == "561720"        # Janitorial
+    assert top("janitorial") == "561720"
+    assert top("trucking") == "484110"        # General Freight Trucking
+    assert top("catering") == "722320"        # Caterers
+    assert top("security guard") == "561612"
+    assert top("plumbing") == "238220"
+    assert top("landscaping") == "561730"
+    assert top("home health") == "621610"
+    # exact code query returns that code first
+    assert top("561720") == "561720"
+    # code prefix works
+    assert "238220" in [r["code"] for r in naics_data.search("2382")]
+    # empty query falls back to the starter list
+    assert naics_data.search("") == naics_data.suggestions()
+    # nonsense returns nothing (not a crash)
+    assert naics_data.search("zzzzzz") == []
+
+
 # ── opportunity matcher ──────────────────────────────────────────
 def test_opportunity_matcher_scores_and_ranks():
     profile = {"certifications": ["WOSB"], "naics_codes": ["541512"], "capabilities": "software development cloud"}

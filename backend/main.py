@@ -33,7 +33,7 @@ import scheduler
 import alerts as alerts_engine
 import advisor as advisor_report
 import winnability as winnability_engine
-from naics_data import naics_name, suggestions as naics_suggestions
+from naics_data import naics_name, suggestions as naics_suggestions, search as naics_search
 
 from ratelimit import search_limit, intel_limit, generate_limit
 from auth import require_user, optional_user, User, auth_enabled
@@ -358,9 +358,11 @@ async def track_solicitation(req: TrackRequest, user: User = Depends(require_use
 # ── NAICS WATCH / ALERTS ─────────────────────────────────────────
 
 @app.get("/api/naics/suggestions")
-async def naics_suggestion_list():
-    """Common NAICS codes with plain-language names for the picker."""
-    return {"suggestions": naics_suggestions()}
+async def naics_suggestion_list(q: Optional[str] = None):
+    """NAICS picker. With ?q= search by code, name, or plain word ("cleaning",
+    "trucking", "catering"); without a query, return a friendly starter list."""
+    results = naics_search(q) if q else naics_suggestions()
+    return {"suggestions": results, "query": q or ""}
 
 @app.get("/api/alerts/settings")
 async def get_alert_settings(user: User = Depends(require_user)):
