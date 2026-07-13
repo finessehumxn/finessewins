@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="FinesseWins seal (mono)">
+  <circle cx="120" cy="120" r="108" fill="none" stroke="#0B0F2A" stroke-width="4"/>
+  <circle cx="120" cy="120" r="96" fill="none" stroke="#0B0F2A" stroke-width="1"/>
+  <defs>
+    <path id="ring" d="M 42 120 A 78 78 0 1 1 198 120 A 78 78 0 1 1 42 120"/>
+  </defs>
+  <text fill="#0B0F2A" font-family="Work Sans, sans-serif" font-size="12" font-weight="600" letter-spacing="2">
+    <textPath href="#ring" startOffset="50%" text-anchor="middle">★ FINESSEWINS ★ EST 2026 ★ USA ★</textPath>
+  </text>
+  <text x="120" y="118" text-anchor="middle" font-family="Instrument Serif, Georgia, serif" font-size="54" fill="#0B0F2A">FW</text>
+  <line x1="70" y1="132" x2="170" y2="132" stroke="#0B0F2A" stroke-width="2"/>
+  <text x="120" y="152" text-anchor="middle" font-family="Work Sans, sans-serif" font-size="10" fill="#0B0F2A" letter-spacing="3">CONTRACT · CO.</text>
+</svg>

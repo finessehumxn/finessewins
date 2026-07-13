@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FinesseWins — Government contracts, won by first-time bidders</title>
+<meta name="description" content="FinesseWins is the government-contracting platform built for first-time WOSB, MBE, DBE, SDVOSB, 8(a), and HUBZone bidders. Find the right solicitations, track every deadline, submit proposals that score.">
+<meta property="og:title" content="FinesseWins — The bid, won.">
+<meta property="og:description" content="The government-contracting platform for first-time certified bidders. Available for individuals and businesses.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1E2761; --navy2:#3A4A9E; --ice:#CADCFC; --gold:#F8C81C;
+  --ink:#0B0F2A; --paper:#FAFBFE; --rule:#DDE3F0;
+  --serif:"Instrument Serif",ui-serif,Georgia,serif;
+  --sans:"Work Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:1rem;line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--navy)}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.wrap{max-width:1060px;margin:0 auto;padding:0 1.5rem}
+
+/* ---- header ---- */
+header{border-bottom:1px solid var(--rule)}
+.hd{display:flex;align-items:center;justify-content:space-between;padding:1.1rem 0}
+.hd img{height:52px;width:auto;display:block}
+.hd-cta{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;border:1.5px solid var(--navy);padding:.55rem 1rem;border-radius:3px}
+.hd-cta:hover{background:var(--navy);color:var(--paper)}
+
+/* ---- doc label device ---- */
+.doclabel{font-family:var(--mono);font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);display:flex;align-items:center;gap:.75rem}
+.doclabel::after{content:"";flex:1;height:1px;background:var(--rule)}
+
+/* ---- hero ---- */
+.hero{position:relative;padding:5rem 0 4.5rem;overflow:hidden}
+.hero-ring{position:absolute;right:-140px;top:-60px;width:480px;opacity:.06;pointer-events:none}
+.hero h1{font-family:var(--serif);font-weight:400;font-size:clamp(3rem,8vw,5.5rem);line-height:1.02;letter-spacing:-.01em;color:var(--navy);margin:1.25rem 0 1.5rem;max-width:14ch}
+.hero h1 em{font-style:italic}
+.hero p{max-width:56ch;font-size:1.08rem;color:#3B4256}
+.certs{margin-top:1.1rem;font-family:var(--mono);font-size:.74rem;letter-spacing:.06em;color:var(--navy)}
+.hero-cta{display:inline-flex;align-items:center;gap:.6rem;margin-top:2rem;background:var(--navy);color:var(--paper);text-decoration:none;font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;padding:1rem 1.5rem;border-radius:3px}
+.hero-cta:hover{background:var(--navy2)}
+.hero-note{display:block;margin-top:.9rem;font-family:var(--mono);font-size:.68rem;color:#6B7390}
+/* the stamp */
+.stamp{position:absolute;right:6%;bottom:14%;width:150px;height:150px;transform:rotate(-11deg);animation:settle .5s ease-out both .25s}
+@keyframes settle{from{transform:rotate(-11deg) scale(1.5);opacity:0}to{transform:rotate(-11deg) scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.stamp{animation:none}}
+@media(max-width:760px){.stamp{position:static;transform:rotate(-6deg);margin-top:2.5rem;width:110px;height:110px}.hero-ring{display:none}}
+
+/* ---- sections ---- */
+section{padding:3.75rem 0;border-top:1px solid var(--rule)}
+h2{font-family:var(--serif);font-weight:400;font-size:clamp(1.9rem,4vw,2.6rem);color:var(--navy);margin:1rem 0 2rem;letter-spacing:-.01em}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.cell{background:var(--paper);padding:1.75rem}
+.cell h3{font-family:var(--serif);font-weight:400;font-size:1.35rem;color:var(--navy);margin-bottom:.6rem}
+.cell p{font-size:.92rem;color:#3B4256}
+.cell .k{font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:#6B7390;display:block;margin-bottom:1rem}
+
+/* eligibility chips */
+.chips{display:flex;flex-wrap:wrap;gap:.6rem}
+.chip{font-family:var(--mono);font-size:.78rem;letter-spacing:.05em;border:1.5px solid var(--navy);color:var(--navy);border-radius:999px;padding:.5rem 1.05rem}
+.elig-note{margin-top:1.4rem;max-width:60ch;font-size:.95rem;color:#3B4256}
+
+/* evaluation criteria */
+.eval{display:grid;grid-template-columns:1fr 1fr;gap:2.5rem;align-items:start}
+.eval p{font-size:1rem;color:#3B4256;margin-bottom:1rem}
+.eval strong{color:var(--navy)}
+.eval-facts{border-left:3px solid var(--gold);padding-left:1.4rem;font-family:var(--mono);font-size:.8rem;line-height:2.1;color:var(--navy)}
+@media(max-width:760px){.eval{grid-template-columns:1fr}}
+
+/* submission band */
+.submit{background:var(--navy);color:var(--paper);border-top:none;padding:4.5rem 0}
+.submit .doclabel{color:var(--ice)}
+.submit .doclabel::after{background:rgba(202,220,252,.25)}
+.submit h2{color:var(--paper)}
+.submit p{color:var(--ice);max-width:56ch}
+.gold-cta{display:inline-block;margin-top:2rem;background:var(--gold);color:var(--ink);text-decoration:none;font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;padding:1rem 1.6rem;border-radius:3px;font-weight:500}
+.gold-cta:hover{filter:brightness(1.06)}
+.submit a.mail{color:var(--ice)}
+
+footer{padding:2.25rem 0;font-family:var(--mono);font-size:.7rem;color:#6B7390;display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+footer a{color:var(--navy);text-decoration:none}
+footer a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap hd">
+    <img src="logo-lockup-horizontal.svg" alt="FinesseWins">
+    <a class="hd-cta" href="#purchase">Get FinesseWins</a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <img class="hero-ring" src="logo-notary-ring.svg" alt="" aria-hidden="true">
+    <div class="doclabel">Notice of award · Available for individuals &amp; businesses</div>
+    <h1>The bid, <em>won.</em></h1>
+    <p>FinesseWins is the government-contracting platform built for first-time certified bidders. Find the solicitations you're actually eligible to win, track every portal and deadline in one place, and submit proposals that score — without a Beltway consultant on retainer.</p>
+    <div class="certs">WOSB · MBE · DBE · SDVOSB · 8(a) · HUBZone</div>
+    <a class="hero-cta" href="#purchase">Request to purchase →</a>
+    <span class="hero-note">Free tier available · First 50 paid members lock their rate for life.</span>
+    <svg class="stamp" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Won — checkmark stamp">
+      <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1E2761"/><stop offset="100%" stop-color="#3A4A9E"/></linearGradient></defs>
+      <rect x="4" y="4" width="120" height="120" rx="16" fill="url(#g)"/>
+      <path d="M30 68 L54 92 L100 40" stroke="#F8C81C" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+  </div>
+
+  <section id="scope">
+    <div class="wrap">
+      <div class="doclabel">Section 1 · Scope of platform</div>
+      <h2>Everything between "where do I even find bids?" and "we won."</h2>
+      <p style="max-width:62ch;font-size:.98rem;color:#3B4256;margin:-1rem 0 2rem">Federal procurement is in the middle of its biggest rewrite in 40 years — old templates, stale clause numbers, and yesterday's playbooks are how first-timers get ruled non-responsive. You need tooling built for how contracting works <em>now</em>.</p>
+      <div class="grid">
+        <div class="cell"><span class="k">Find</span><h3>Every bid site, one search</h3><p>SAM.gov, Grants.gov, FedConnect, DLA DIBBS, GSA eBuy, and state &amp; local portals searched concurrently and de-duplicated. Search by keyword, NAICS, or set-aside — with per-source status so you know what's live.</p></div>
+        <div class="cell"><span class="k">Score</span><h3>Bid IQ — know your odds</h3><p>A transparent 0–100 winnability score built from real federal award history, plus a price-to-win band showing what winning bids actually cost, incumbent analysis, and market intel per NAICS and agency.</p></div>
+        <div class="cell"><span class="k">Watch</span><h3>Bid Radar</h3><p>Save your trades in plain English — "cleaning," "trucking," "catering" — and the platform sweeps every bid site twice a day, drops matches into one feed, and emails you digests. Nothing closes without you knowing.</p></div>
+        <div class="cell"><span class="k">Draft</span><h3>AI proposals — even with zero past performance</h3><p>Full Technical, Past Performance, and Price volumes, compliance-checked against the solicitation, exported as a submission-ready Word doc. Zero-past-performance mode is built for your very first bid.</p></div>
+        <div class="cell"><span class="k">Decode</span><h3>Toolkit</h3><p>Paste a dense RFP and get it in plain English. Generate a capability statement and export it to Word. Check which set-asides you're actually eligible for before you waste a cycle.</p></div>
+        <div class="cell"><span class="k">Track</span><h3>Amendments, deadlines, pipeline</h3><p>Track any solicitation and get email alerts when it changes — amendments, Q&amp;A, deadline shifts. Your whole pipeline, live stats, and upcoming deadlines on one dashboard.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="eligibility">
+    <div class="wrap">
+      <div class="doclabel">Section 2 · Eligibility</div>
+      <h2>Built for the set-asides.</h2>
+      <div class="chips">
+        <span class="chip">WOSB</span><span class="chip">MBE</span><span class="chip">DBE</span>
+        <span class="chip">SDVOSB</span><span class="chip">8(a)</span><span class="chip">HUBZone</span>
+      </div>
+      <p class="elig-note">Certified — or still working on your certifications? Either way, FinesseWins is designed around the programs created for businesses like yours, so your status works for you instead of sitting in a drawer.</p>
+      <div style="margin-top:2.5rem;border:1px solid var(--rule);border-left:3px solid var(--navy);padding:1.5rem 1.75rem">
+        <div style="font-family:var(--mono);font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:#6B7390;margin-bottom:.5rem">For accelerators, SBDCs &amp; agencies</div>
+        <p style="font-size:.95rem;max-width:64ch;color:#3B4256"><strong style="color:var(--navy)">Advisor Console:</strong> manage multiple client companies in one account, match opportunities per client, and export impact reports — bids submitted and dollars won across your whole cohort.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="evaluation">
+    <div class="wrap">
+      <div class="doclabel">Section 3 · Evaluation criteria — why us</div>
+      <h2>We bid on government work every month. This is our own playbook.</h2>
+      <div class="eval">
+        <div>
+          <p>FinesseWins is built by <strong>Millennials Creatives LLC</strong> — a woman-owned, minority-owned firm that submits its own government bids month in, month out. We've navigated SAM.gov, state procurement portals, RFIs, RFPs, and evaluation debriefs as a first-time bidder ourselves.</p>
+          <p>This platform is the system we built to run our own pipeline, productized for every certified business that's been told government contracting "isn't for companies your size."</p>
+        </div>
+        <div class="eval-facts">
+          WOSB · MBE · DBE certified<br>
+          SAM registered · CAGE 18ZQ0<br>
+          UEI WBGAAWMD3YE5<br>
+          Phoenix, Arizona<br>
+          millennialscreatives.com
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="submit" id="purchase">
+    <div class="wrap">
+      <div class="doclabel">Section 4 · Submission — purchase</div>
+      <h2>Your first win starts with one email.</h2>
+      <p>FinesseWins is available for individuals, businesses, and the organizations that support them. Start on the free tier, upgrade when you're winning — and the first 50 paid members lock their rate for life.</p>
+      <div style="display:inline-block;margin-top:1.25rem;border:1.5px solid var(--gold);border-radius:3px;padding:.5rem 1rem;font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)">Founding members · First 50 paid subscribers lock their rate for life</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1.25rem;margin-top:2.25rem">
+        <div style="border:1px solid rgba(202,220,252,.35);border-radius:4px;padding:1.5rem">
+          <div style="font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:.5rem">Free</div>
+          <div style="margin-bottom:.75rem"><span style="font-family:var(--serif);font-size:1.9rem;color:var(--gold)">$0</span><span style="font-family:var(--mono);font-size:.7rem;color:var(--ice)"> forever</span></div>
+          <p style="font-size:.85rem;margin-bottom:1.25rem">Try the platform with monthly proposal limits. See your matches before you pay a dollar.</p>
+          <a class="gold-cta" style="margin-top:0" href="mailto:contact@millennialscreatives.com?subject=FinesseWins%20Free&body=I%27d%20like%20to%20get%20started%20with%20FinesseWins%20(Free).%0A%0AName%3A%0ABusiness%20name%3A%0ACertifications%20(or%20in%20progress)%3A">Get started →</a>
+        </div>
+        <div style="border:1px solid rgba(202,220,252,.35);border-radius:4px;padding:1.5rem">
+          <div style="font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:.5rem">Solo</div>
+          <div style="margin-bottom:.75rem"><span style="font-family:var(--serif);font-size:1.9rem;color:var(--gold)">$47</span><span style="font-family:var(--mono);font-size:.7rem;color:var(--ice)">/mo</span></div>
+          <p style="font-size:.85rem;margin-bottom:1.25rem">For individual bidders and single-member firms going after their first wins.</p>
+          <a class="gold-cta" style="margin-top:0" href="mailto:contact@millennialscreatives.com?subject=FinesseWins%20Solo&body=I%27d%20like%20to%20get%20started%20with%20FinesseWins%20(Solo).%0A%0AName%3A%0ABusiness%20name%3A%0ACertifications%20(or%20in%20progress)%3A">Get started →</a>
+        </div>
+        <div style="border:1px solid var(--gold);border-radius:4px;padding:1.5rem">
+          <div style="font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:.5rem">Pro</div>
+          <div style="margin-bottom:.75rem"><span style="font-family:var(--serif);font-size:1.9rem;color:var(--gold)">$97</span><span style="font-family:var(--mono);font-size:.7rem;color:var(--ice)">/mo</span></div>
+          <p style="font-size:.85rem;margin-bottom:1.25rem">For firms running a real pipeline — more proposals, more tracking, more wins.</p>
+          <a class="gold-cta" style="margin-top:0" href="mailto:contact@millennialscreatives.com?subject=FinesseWins%20Pro&body=I%27d%20like%20to%20get%20started%20with%20FinesseWins%20(Pro).%0A%0AName%3A%0ABusiness%20name%3A%0ACertifications%20(or%20in%20progress)%3A">Get started →</a>
+        </div>
+        <div style="border:1px solid rgba(202,220,252,.35);border-radius:4px;padding:1.5rem">
+          <div style="font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:.5rem">Agency</div>
+          <div style="margin-bottom:.75rem"><span style="font-family:var(--serif);font-size:1.9rem;color:var(--gold)">$297</span><span style="font-family:var(--mono);font-size:.7rem;color:var(--ice)">/mo</span></div>
+          <p style="font-size:.85rem;margin-bottom:1.25rem">For advisors and consultancies managing multiple client companies with the Advisor Console.</p>
+          <a class="gold-cta" style="margin-top:0" href="mailto:contact@millennialscreatives.com?subject=FinesseWins%20Agency&body=I%27d%20like%20to%20get%20started%20with%20FinesseWins%20(Agency).%0A%0AName%3A%0ABusiness%20name%3A%0ACertifications%20(or%20in%20progress)%3A">Get started →</a>
+        </div>
+        <div style="border:1px solid rgba(202,220,252,.35);border-radius:4px;padding:1.5rem">
+          <div style="font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:.5rem">Org</div>
+          <div style="margin-bottom:.75rem"><span style="font-family:var(--serif);font-size:1.9rem;color:var(--gold)">$499</span><span style="font-family:var(--mono);font-size:.7rem;color:var(--ice)">/mo</span></div>
+          <p style="font-size:.85rem;margin-bottom:1.25rem">For SBDCs, accelerators, and institutions supporting a whole cohort of bidders — with impact reporting.</p>
+          <a class="gold-cta" style="margin-top:0" href="mailto:contact@millennialscreatives.com?subject=FinesseWins%20Org&body=I%27d%20like%20to%20get%20started%20with%20FinesseWins%20(Org).%0A%0AName%3A%0ABusiness%20name%3A%0ACertifications%20(or%20in%20progress)%3A">Get started →</a>
+        </div>
+      </div>
+      <p style="margin-top:1.5rem;font-family:var(--mono);font-size:.72rem">Questions first? Write to <a class="mail" href="mailto:contact@millennialscreatives.com">contact@millennialscreatives.com</a></p>
+    </div>
+  </section>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap" style="display:contents">
+    <span>© 2026 Millennials Creatives LLC · Phoenix AZ</span>
+    <span><a href="https://millennialscreatives.com">millennialscreatives.com</a> · <a href="mailto:contact@millennialscreatives.com">contact@millennialscreatives.com</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
