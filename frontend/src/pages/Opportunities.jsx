@@ -6,21 +6,14 @@ const KIND_COLOR = {
 }
 const WIN_TONE = { good: "#1DB954", ok: "#1FB6EE", warn: "#F8C81C", bad: "#FF6432" }
 
-const MOCK_OPPS = [
-  { id: "1", source: "AZ APP Portal", solicitation_number: "BPM007574", title: "Child Specific Recruitment", agency: "AZ Dept of Child Safety", naics_code: "624110", set_aside: null, deadline: "2026-07-08T12:00:00", value_est: "$25K–$100K", match: 94 },
-  { id: "2", source: "AZ APP Portal", solicitation_number: "BPM007660", title: "School Improvement & Leadership Development", agency: "Salt River Schools (SRPMIC)", naics_code: "611430", set_aside: null, deadline: "2026-07-23T17:00:00", value_est: "$50K–$200K", match: 88 },
-  { id: "3", source: "AZ APP Portal", solicitation_number: "BPM007669", title: "Cost of Service Study", agency: "City of Chandler", naics_code: "541611", set_aside: null, deadline: "2026-07-21T16:00:00", value_est: "$30K–$80K", match: 76 },
-  { id: "4", source: "AZ APP Portal", solicitation_number: "BPM007670", title: "Public Safety Logging Recorder System", agency: "Salt River Pima-Maricopa", naics_code: "541512", set_aside: null, deadline: "2026-07-15T16:00:00", value_est: "$50K–$150K", match: 72 },
-  { id: "5", source: "SAM.gov", solicitation_number: "VA-2026-IT-001", title: "Clinical Documentation AI System", agency: "Dept of Veterans Affairs", naics_code: "541511", set_aside: "WOSB", deadline: "2026-08-15T17:00:00", value_est: "$200K–$500K", match: 97 },
-  { id: "6", source: "SAM.gov", solicitation_number: "IHS-2026-TECH-002", title: "Tribal Health IT Modernization", agency: "Indian Health Service", naics_code: "541512", set_aside: "SBA", deadline: "2026-09-01T17:00:00", value_est: "$100K–$300K", match: 91 },
-]
-
 export default function Opportunities({ onNavigate }) {
   const [search, setSearch] = useState("")
   const [naics, setNaics] = useState("")
   const [setAside, setSetAside] = useState("")
   const [loading, setLoading] = useState(false)
-  const [results, setResults] = useState(MOCK_OPPS)
+  const [results, setResults] = useState([])
+  const [searched, setSearched] = useState(false)      // has the user run a search yet
+  const [error, setError] = useState(null)
   const [sourceReport, setSourceReport] = useState([]) // per-source counts after a search
   const [allSources, setAllSources] = useState([])     // every site we search
   const [scores, setScores] = useState({})             // winnability score per result id
@@ -37,7 +30,7 @@ export default function Opportunities({ onNavigate }) {
   }, [])
 
   const doSearch = async () => {
-    setLoading(true)
+    setLoading(true); setError(null); setSearched(true)
     try {
       const data = await apiJson("/api/opportunities/search", {
         method: "POST",
@@ -59,9 +52,10 @@ export default function Opportunities({ onNavigate }) {
         apiJson("/api/intel/scores", { method: "POST", body: JSON.stringify({ items }) })
           .then(s => setScores(s.scores || {})).catch(() => {})
       }
-    } catch {
-      setResults(MOCK_OPPS)
+    } catch (e) {
+      setResults([])
       setSourceReport([])
+      setError(e.message || "Search failed — please try again.")
     } finally {
       setLoading(false)
     }
@@ -133,6 +127,24 @@ export default function Opportunities({ onNavigate }) {
           </div>
           <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: ".7rem", color: "rgba(255,255,255,.3)", marginTop: ".55rem" }}>
             <span style={{ color: "#1DB954" }}>●</span> live API · <span style={{ color: "rgba(255,255,255,.5)" }}>●</span> curated feed
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ background: "rgba(255,100,80,.1)", border: "1px solid rgba(255,100,80,.3)", borderRadius: 8, padding: ".8rem 1rem", marginBottom: "1rem", fontSize: ".85rem", color: "#FF8870" }}>{error}</div>
+      )}
+
+      {/* Empty states */}
+      {!loading && filtered.length === 0 && (
+        <div style={{ textAlign: "center", padding: "3rem 1.5rem", border: "1px dashed rgba(255,255,255,.1)", borderRadius: 12 }}>
+          <div style={{ fontSize: "1rem", color: "rgba(255,255,255,.75)", marginBottom: ".4rem" }}>
+            {searched ? "No opportunities matched" : "Search live government opportunities"}
+          </div>
+          <div style={{ fontSize: ".85rem", color: "rgba(255,255,255,.4)", maxWidth: 440, margin: "0 auto" }}>
+            {searched
+              ? "Try broader keywords, a different NAICS code, or clear the set-aside filter. We search SAM.gov, Grants.gov, FedConnect, and state/local portals."
+              : "Enter a keyword or your NAICS code above and hit Search. FinesseWins pulls live bids from every major federal, grant, and state/local site into one list."}
           </div>
         </div>
       )}

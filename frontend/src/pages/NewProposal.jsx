@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { apiJson } from "../lib/api"
 
 const VOLUMES = [
@@ -20,18 +20,44 @@ export default function NewProposal({ onNavigate }) {
     agency: "",
     requirements: "",
     deadline: "",
-    naics_code: "541512",
+    naics_code: "",
     set_aside: "",
     volumes: ["technical", "past_performance", "pricing"],
-    // Company (pre-filled from MC)
-    company_name: "Millennials Creatives LLC",
-    uei: "WBGAAWMD3YE5",
-    cage: "18ZQ0",
-    ein: "84-3960409",
-    certifications: ["WOSB", "MBE", "DBE", "Black-Owned"],
-    capabilities: "AI engineering, brand strategy, healthcare consulting, government contracting, web development, custom software, training and development.",
+    // Company — seeded from the signed-in user's saved profile (see effect below)
+    company_name: "",
+    uei: "",
+    cage: "",
+    ein: "",
+    certifications: [],
+    naics_codes: [],
+    capabilities: "",
+    state: "",
     past_performance: [],
   })
+
+  // Pre-fill the company section from the user's saved Company Profile.
+  useEffect(() => {
+    let alive = true
+    apiJson("/api/profile")
+      .then(({ profile: p }) => {
+        if (!alive || !p || !Object.keys(p).length) return
+        setForm(f => ({
+          ...f,
+          company_name: p.name || f.company_name,
+          uei: p.uei || f.uei,
+          cage: p.cage || f.cage,
+          ein: p.ein || f.ein,
+          certifications: Array.isArray(p.certifications) && p.certifications.length ? p.certifications : f.certifications,
+          naics_codes: Array.isArray(p.naics_codes) ? p.naics_codes : f.naics_codes,
+          capabilities: p.capabilities || f.capabilities,
+          state: p.state || f.state,
+          past_performance: Array.isArray(p.past_performance) ? p.past_performance : f.past_performance,
+          naics_code: f.naics_code || (Array.isArray(p.naics_codes) && p.naics_codes[0]) || "",
+        }))
+      })
+      .catch(() => {}) // no profile / auth off — user fills the fields manually
+    return () => { alive = false }
+  }, [])
 
   const update = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
@@ -70,10 +96,10 @@ export default function NewProposal({ onNavigate }) {
           cage: form.cage,
           ein: form.ein,
           certifications: form.certifications,
-          naics_codes: [form.naics_code, "541511", "541519"],
+          naics_codes: Array.from(new Set([form.naics_code, ...form.naics_codes].filter(Boolean))),
           capabilities: form.capabilities,
           past_performance: form.past_performance,
-          state: "AZ",
+          state: form.state || null,
         }
       }
 

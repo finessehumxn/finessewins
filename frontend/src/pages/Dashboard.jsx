@@ -2,14 +2,6 @@ import { useState, useEffect } from "react"
 import { apiJson } from "../lib/api"
 import GettingStarted from "../components/GettingStarted"
 
-const MOCK_PROPOSALS = [
-  { id: "1", title: "SSS Website Modernization", agency: "Selective Service System", solicitation: "90MC0026R0004", status: "submitted", deadline: "2026-07-06", value: "$392,000" },
-  { id: "2", title: "ICPC Interstate Compact", agency: "AZ Dept of Child Safety", solicitation: "BPM007620", status: "submitted", deadline: "2026-06-30", value: "$14,350" },
-  { id: "3", title: "LIHTC Application Support", agency: "Salt River Pima-Maricopa", solicitation: "ECS-26-037", status: "submitted", deadline: "2026-06-24", value: "$50,000" },
-  { id: "4", title: "Child Specific Recruitment", agency: "AZ Dept of Child Safety", solicitation: "BPM007574", status: "in_progress", deadline: "2026-07-08", value: "TBD" },
-  { id: "5", title: "School Improvement Services", agency: "Salt River Schools", solicitation: "BPM007660", status: "not_started", deadline: "2026-07-23", value: "TBD" },
-]
-
 const STATUS_CONFIG = {
   submitted: { label: "Submitted", color: "#1DB954", bg: "rgba(29,185,84,.1)" },
   in_progress: { label: "In Progress", color: "#F8C81C", bg: "rgba(248,200,28,.1)" },
@@ -19,12 +11,18 @@ const STATUS_CONFIG = {
   error: { label: "Error", color: "#FF6432", bg: "rgba(255,100,50,.1)" },
 }
 
-const SAMPLE_STATS = [
-  { label: "Bids Submitted", value: "6+", sub: "This quarter" },
-  { label: "Pipeline Value", value: "$1M+", sub: "Total submitted" },
-  { label: "Certifications", value: "WOSB · MBE · DBE", sub: "Active" },
-  { label: "Win Rate", value: "—", sub: "First awards pending" },
-]
+const CERT_LABELS = {
+  WOSB: "WOSB — Women-Owned Small Business",
+  EDWOSB: "EDWOSB — Economically Disadvantaged WOSB",
+  MBE: "MBE — Minority Business Enterprise",
+  DBE: "DBE — Disadvantaged Business Enterprise",
+  "8A": "8(a) — SBA Business Development",
+  HUBZone: "HUBZone — Historically Underutilized Business Zone",
+  SDVOSB: "SDVOSB — Service-Disabled Veteran-Owned",
+  VOSB: "VOSB — Veteran-Owned Small Business",
+  SDB: "SDB — Small Disadvantaged Business",
+  "Black-Owned": "Black-Owned Business",
+}
 
 const daysUntil = (deadline) => {
   if (!deadline) return 9999
@@ -44,47 +42,59 @@ const toRow = (p) => ({
 
 export default function Dashboard({ onNavigate }) {
   const [filter, setFilter] = useState("all")
-  const [proposals, setProposals] = useState(MOCK_PROPOSALS)
-  const [usingReal, setUsingReal] = useState(false)
+  const [proposals, setProposals] = useState([])
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     let alive = true
-    apiJson("/api/proposals")
-      .then(({ proposals: list }) => {
-        if (!alive || !Array.isArray(list)) return
-        if (list.length) {
-          setProposals(list.map(toRow))
-          setUsingReal(true)
-        }
+    Promise.all([
+      apiJson("/api/proposals").catch(() => ({ proposals: [] })),
+      apiJson("/api/profile").catch(() => null),
+    ])
+      .then(([list, prof]) => {
+        if (!alive) return
+        setProposals(Array.isArray(list?.proposals) ? list.proposals.map(toRow) : [])
+        setProfile(prof || null)
       })
-      .catch(() => {}) // unauth / backend down → keep sample data
+      .catch((e) => { if (alive) setError(e.message) })
+      .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [])
 
   const filtered = proposals.filter(p => filter === "all" || p.status === filter)
 
-  const stats = usingReal ? [
+  const stats = [
     { label: "Proposals", value: String(proposals.length), sub: "All time" },
-    { label: "Completed", value: String(proposals.filter(p => p.status === "complete").length), sub: "Ready to submit" },
-    { label: "In Progress", value: String(proposals.filter(p => p.status === "generating").length), sub: "Generating" },
+    { label: "Completed", value: String(proposals.filter(p => p.status === "complete" || p.status === "submitted").length), sub: "Ready to submit" },
+    { label: "In Progress", value: String(proposals.filter(p => p.status === "generating" || p.status === "in_progress").length), sub: "Working on it" },
     { label: "Due ≤ 7 days", value: String(proposals.filter(p => { const d = daysUntil(p.deadline); return d >= 0 && d <= 7 }).length), sub: "Act now" },
-  ] : SAMPLE_STATS
+  ]
+
+  const certs = Array.isArray(profile?.certifications) ? profile.certifications.filter(Boolean) : []
+  const companyLabel = profile?.name
+    ? `${profile.name}${profile.cage ? ` · CAGE ${profile.cage}` : ""}`
+    : "Your Bid Pipeline"
+
+  if (loading) return (
+    <div style={{ padding: "3rem", textAlign: "center", color: "rgba(255,255,255,.4)", fontFamily: "'DM Mono', monospace", fontSize: ".8rem" }}>Loading your pipeline…</div>
+  )
 
   return (
     <div>
       <div style={{ marginBottom: "2rem" }}>
         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".65rem", letterSpacing: ".15em", textTransform: "uppercase", color: "#EC1C7B", marginBottom: ".5rem" }}>
-          Millennials Creatives LLC · CAGE 18ZQ0
+          {companyLabel}
         </div>
         <h1 style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.8rem", fontWeight: 900, margin: 0, letterSpacing: "-.02em" }}>
           Bid Pipeline
         </h1>
-        {!usingReal && (
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.3)", marginTop: ".5rem" }}>
-            Showing sample pipeline — generate a proposal to see your own
-          </div>
-        )}
       </div>
+
+      {error && (
+        <div style={{ background: "rgba(255,100,80,.1)", border: "1px solid rgba(255,100,80,.3)", borderRadius: 8, padding: ".8rem 1rem", marginBottom: "1rem", fontSize: ".85rem", color: "#FF8870" }}>{error}</div>
+      )}
 
       {/* First-run onboarding checklist (hides itself once complete/dismissed) */}
       <GettingStarted onNavigate={onNavigate} />
@@ -149,7 +159,24 @@ export default function Dashboard({ onNavigate }) {
           <span></span>
         </div>
 
-        {filtered.map((p, i) => {
+        {filtered.length === 0 ? (
+          <div style={{ padding: "2.5rem 1.25rem", textAlign: "center" }}>
+            <div style={{ fontSize: ".95rem", color: "rgba(255,255,255,.7)", marginBottom: ".4rem" }}>
+              {proposals.length === 0 ? "No proposals yet" : "Nothing matches this filter"}
+            </div>
+            <div style={{ fontSize: ".82rem", color: "rgba(255,255,255,.4)", marginBottom: "1.1rem" }}>
+              {proposals.length === 0
+                ? "Find a live opportunity and let FinesseWins draft your first proposal."
+                : "Try a different status filter above."}
+            </div>
+            {proposals.length === 0 && (
+              <button onClick={() => onNavigate("opportunities")}
+                style={{ background: "rgba(31,182,238,.12)", color: "#1FB6EE", border: "1px solid rgba(31,182,238,.35)", padding: ".55rem 1.2rem", fontFamily: "'DM Mono', monospace", fontSize: ".64rem", letterSpacing: ".1em", textTransform: "uppercase", cursor: "pointer", borderRadius: 6, fontWeight: 600 }}>
+                Find bids →
+              </button>
+            )}
+          </div>
+        ) : filtered.map((p, i) => {
           const status = STATUS_CONFIG[p.status] || STATUS_CONFIG.not_started
           const days = daysUntil(p.deadline)
           const urgent = days <= 3 && days >= 0
@@ -201,11 +228,21 @@ export default function Dashboard({ onNavigate }) {
       <div style={{ marginTop: "2rem", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
         <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12, padding: "1.5rem" }}>
           <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".65rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#1FB6EE", marginBottom: ".75rem" }}>Active Certifications</div>
-          {["WOSB — Women-Owned Small Business", "MBE — Minority Business Enterprise", "DBE — Disadvantaged Business Enterprise", "SAM.gov Active — UEI: WBGAAWMD3YE5"].map(c => (
+          {certs.length > 0 ? certs.map(c => (
             <div key={c} style={{ display: "flex", alignItems: "center", gap: ".5rem", padding: ".3rem 0", fontSize: ".82rem", color: "rgba(255,255,255,.7)" }}>
-              <span style={{ color: "#1DB954", fontSize: ".7rem" }}>✓</span> {c}
+              <span style={{ color: "#1DB954", fontSize: ".7rem" }}>✓</span> {CERT_LABELS[c] || c}
             </div>
-          ))}
+          )) : (
+            <div style={{ fontSize: ".8rem", color: "rgba(255,255,255,.4)" }}>
+              No certifications yet.{" "}
+              <span onClick={() => onNavigate("profile")} style={{ color: "#1FB6EE", cursor: "pointer" }}>Add them in Company Profile →</span>
+            </div>
+          )}
+          {profile?.uei && (
+            <div style={{ display: "flex", alignItems: "center", gap: ".5rem", padding: ".3rem 0", fontSize: ".82rem", color: "rgba(255,255,255,.7)" }}>
+              <span style={{ color: "#1DB954", fontSize: ".7rem" }}>✓</span> SAM.gov · UEI: {profile.uei}
+            </div>
+          )}
         </div>
         <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12, padding: "1.5rem" }}>
           <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".65rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#EC1C7B", marginBottom: ".75rem" }}>Upcoming Deadlines</div>
