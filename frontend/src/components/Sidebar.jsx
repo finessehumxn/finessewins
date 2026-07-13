@@ -7,6 +7,7 @@ const NAV = [
   { id: "opportunities", label: "Find Bids",        icon: "🔍" },
   { id: "intel",         label: "Bid IQ",           icon: "📊" },
   { id: "alerts",        label: "Bid Radar",        icon: "📡" },
+  { id: "rfp-shredder",  label: "RFP Shredder",     icon: "📄" },
   { id: "new-proposal",  label: "New Proposal",     icon: "✦" },
   { id: "toolkit",       label: "Toolkit",          icon: "🧰" },
   { id: "advisor",       label: "Advisor Console",  icon: "🏛" },

@@ -14,7 +14,7 @@ import asyncio
 from datetime import datetime
 from typing import Optional, List
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -34,6 +34,8 @@ import alerts as alerts_engine
 import advisor as advisor_report
 import winnability as winnability_engine
 from naics_data import naics_name, suggestions as naics_suggestions, search as naics_search
+import docparse
+import rfp_shredder
 
 from ratelimit import search_limit, intel_limit, generate_limit
 from auth import require_user, optional_user, User, auth_enabled
@@ -281,6 +283,112 @@ async def explain_rfp(req: dict, user=Depends(optional_user)):
         certifications=req.get("certifications", ["WOSB", "MBE"]),
     )
     return {"explanation": explanation}
+
+
+# ── RFP SHREDDER (upload → shred → compliance matrix → strengthen) ────
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024   # 15 MB per file
+
+
+async def _read_upload(f: UploadFile):
+    data = await f.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, f"{f.filename} is too large (max 15 MB).")
+    try:
+        return docparse.parse(data, f.filename or "upload")
+    except ValueError as e:
+        raise HTTPException(415, str(e))
+
+
+@app.post("/api/rfp/shred")
+async def rfp_shred(
+    file: UploadFile = File(...),
+    title: str = Form(""),
+    agency: str = Form(""),
+    user=Depends(optional_user),
+    _rl=Depends(generate_limit),
+):
+    """Upload the actual solicitation → structured requirements graph (Section L/M)."""
+    doc = await _read_upload(file)
+    if doc.word_count < 40:
+        raise HTTPException(422, "That document has almost no readable text — if it's a scanned PDF, upload a text-based copy.")
+    try:
+        result = await rfp_shredder.shred(doc.text, title=title or doc.filename, agency=agency)
+    except rfp_shredder.ShredderUnavailable as e:
+        raise HTTPException(503, str(e))
+    result["rfp"] = {"filename": doc.filename, "words": doc.word_count, "pages": doc.pages,
+                     "sections": [s.heading for s in doc.sections[:40]]}
+    return result
+
+
+@app.post("/api/rfp/analyze")
+async def rfp_analyze(
+    files: List[UploadFile] = File(...),
+    requirements: str = Form(...),
+    user=Depends(optional_user),
+    _rl=Depends(generate_limit),
+):
+    """Score the user's own documents against each requirement → compliance matrix."""
+    try:
+        reqs = json.loads(requirements)
+    except Exception:
+        raise HTTPException(400, "requirements must be a JSON array.")
+    if not isinstance(reqs, list) or not reqs:
+        raise HTTPException(400, "No requirements to analyze — shred the RFP first.")
+    docs = []
+    for f in files:
+        d = await _read_upload(f)
+        docs.append({"name": d.filename, "text": d.text})
+    if not any(d["text"].strip() for d in docs):
+        raise HTTPException(422, "None of the uploaded documents had readable text.")
+    try:
+        result = await rfp_shredder.analyze(reqs, docs)
+    except rfp_shredder.ShredderUnavailable as e:
+        raise HTTPException(503, str(e))
+    # Return parsed text so the client can feed the right content to /strengthen.
+    result["docs"] = [{"name": d["name"], "text": d["text"], "words": len(d["text"].split())} for d in docs]
+    return result
+
+
+class StrengthenReq(BaseModel):
+    requirement: dict
+    user_content: str = ""
+    company_profile: Optional[dict] = None
+    solicitation_vocab: str = ""
+
+
+@app.post("/api/rfp/strengthen")
+async def rfp_strengthen(req: StrengthenReq, user=Depends(optional_user), _rl=Depends(generate_limit)):
+    """Rewrite the user's content to fully address one requirement — never inventing facts."""
+    profile = req.company_profile
+    if profile is None and user:
+        profile = await profile_store.get(user.id)
+    try:
+        return await rfp_shredder.strengthen(
+            req.requirement, req.user_content,
+            company_profile=profile, solicitation_vocab=req.solicitation_vocab,
+        )
+    except rfp_shredder.ShredderUnavailable as e:
+        raise HTTPException(503, str(e))
+
+
+class MatrixExport(BaseModel):
+    title: str = "Solicitation"
+    agency: str = ""
+    requirements: List[dict]
+    matrix: List[dict]
+    coverage_pct: int = 0
+
+
+@app.post("/api/rfp/export/matrix")
+async def rfp_export_matrix(req: MatrixExport, user=Depends(optional_user)):
+    """Download the compliance matrix as a submission-ready .docx."""
+    buf = rfp_shredder.build_matrix_docx(req.title, req.requirements, req.matrix, req.coverage_pct, req.agency)
+    name = (req.title or "solicitation").replace(" ", "_")[:60]
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{name}_Compliance_Matrix.docx"'},
+    )
 
 # ── COMPANY PROFILE ──────────────────────────────────────────────
 

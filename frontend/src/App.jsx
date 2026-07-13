@@ -7,6 +7,7 @@ import Alerts from "./pages/Alerts"
 import Advisor from "./pages/Advisor"
 import BidIQ from "./pages/BidIQ"
 import Toolkit from "./pages/Toolkit"
+import RfpShredder from "./pages/RfpShredder"
 import Profile from "./pages/Profile"
 import Pricing from "./pages/Pricing"
 import Login from "./pages/Login"
@@ -72,6 +73,7 @@ export default function App() {
           {page === "intel"        && <BidIQ onNavigate={navigate} seed={intelSeed} />}
           {page === "advisor"      && <Advisor onNavigate={navigate} />}
           {page === "toolkit"      && <Toolkit onNavigate={navigate} />}
+          {page === "rfp-shredder" && <RfpShredder onNavigate={navigate} />}
           {page === "pricing"      && <Pricing onNavigate={navigate} />}
           {page === "profile"      && <Profile onNavigate={navigate} />}
         </ErrorBoundary>

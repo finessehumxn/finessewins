@@ -14,3 +14,4 @@ python-docx         # DOCX proposal export
 stripe              # subscription billing
 beautifulsoup4      # live scraping (AZ APP Portal, FedConnect)
 lxml                # fast HTML parser for BeautifulSoup
+pypdf               # parse uploaded RFP PDFs (RFP Shredder)

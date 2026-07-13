@@ -35,6 +35,53 @@ def test_naics_name_exact_and_sector():
     assert naics_data.naics_name(None) is None
 
 
+def test_docparse_docx_sections_and_text():
+    import io, docx, docparse
+    d = docx.Document()
+    d.add_heading("SECTION L — INSTRUCTIONS", level=1)
+    d.add_paragraph("Submit a technical approach not to exceed 10 pages.")
+    d.add_heading("SECTION M — EVALUATION", level=1)
+    d.add_paragraph("Proposals scored on experience and price.")
+    buf = io.BytesIO(); d.save(buf)
+    parsed = docparse.parse(buf.getvalue(), "rfp.docx")
+    assert parsed.kind == "docx"
+    assert "technical approach" in parsed.text.lower()
+    heads = [s.heading for s in parsed.sections]
+    assert any("SECTION L" in h for h in heads) and any("SECTION M" in h for h in heads)
+
+
+def test_docparse_rejects_unsupported():
+    import docparse, pytest
+    with pytest.raises(ValueError):
+        docparse.parse(b"data", "notes.rtf")
+
+
+def test_shredder_normalizes_and_scores(monkeypatch):
+    import rfp_shredder as R
+
+    class FakeResp:
+        def __init__(self, c): self.content = c
+    class FakeLLM:
+        max_tokens = 8000
+        def __init__(self, c): self._c = c
+        async def ainvoke(self, msgs): return FakeResp(self._c)
+
+    # shred: fills ids + coerces mandatory
+    monkeypatch.setattr(R, "_get_llm", lambda mt=8000: FakeLLM(
+        '{"summary":"s","requirements":[{"text":"Submit tech approach","category":"Technical"}]}'))
+    out = run(R.shred("rfp text"))
+    assert out["requirements"][0]["id"] == "R1" and out["requirements"][0]["mandatory"] is True
+
+    # analyze: clamps coverage, fills missing reqs, computes counts
+    reqs = [{"id": "R1", "text": "a", "category": "x"}, {"id": "R2", "text": "b", "category": "y"}]
+    monkeypatch.setattr(R, "_get_llm", lambda mt=8000: FakeLLM(
+        '{"matrix":[{"id":"R1","status":"addressed","coverage":999,"doc":"d","evidence":"e","note":"n"}]}'))
+    a = run(R.analyze(reqs, [{"name": "d.docx", "text": "content"}]))
+    assert a["matrix"][0]["coverage"] == 100
+    assert a["counts"] == {"addressed": 1, "partial": 0, "missing": 1, "total": 2}
+    assert a["coverage_pct"] == 50
+
+
 def test_naics_search_by_trade_and_code():
     def top(q):
         r = naics_data.search(q)

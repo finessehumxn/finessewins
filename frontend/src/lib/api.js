@@ -16,8 +16,10 @@ async function authHeader() {
  * API base URL. Use for every backend call.
  */
 export async function apiFetch(path, options = {}) {
+  // For multipart uploads, let the browser set Content-Type (with boundary).
+  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData
   const headers = {
-    "Content-Type": "application/json",
+    ...(isForm ? {} : { "Content-Type": "application/json" }),
     ...(await authHeader()),
     ...(options.headers || {}),
   }
@@ -44,6 +46,17 @@ export async function apiJson(path, options = {}) {
     try {
       detail = (await res.json()).detail || detail
     } catch {}
+    throw new Error(detail)
+  }
+  return res.json()
+}
+
+/** POST a multipart FormData (file uploads) and parse the JSON response. */
+export async function apiUpload(path, formData) {
+  const res = await apiFetch(path, { method: "POST", body: formData })
+  if (!res.ok) {
+    let detail = res.statusText
+    try { detail = (await res.json()).detail || detail } catch {}
     throw new Error(detail)
   }
   return res.json()
