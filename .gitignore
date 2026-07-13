@@ -19,3 +19,4 @@ venv/
 # misc
 .DS_Store
 *.log
+frontend/package-lock.json
