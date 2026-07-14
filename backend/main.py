@@ -58,9 +58,15 @@ ALLOWED_ORIGINS = [o.strip() for o in os.environ.get(
     "http://localhost:5173,https://app.finessewins.com,https://finessewins.com"
 ).split(",") if o.strip()]
 
+# Also allow any Render subdomain (finessewins-app/web/preview…) and any
+# finessewins.com subdomain automatically — so the deployed app works without
+# hand-editing CORS_ORIGINS in the dashboard for every URL.
+ALLOWED_ORIGIN_REGEX = r"https://([a-z0-9-]+\.)*(onrender\.com|finessewins\.com)$"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
