@@ -14,6 +14,13 @@ import asyncio
 from datetime import datetime
 from typing import Optional, List
 
+# Load a local .env if present (dev). In prod, the platform sets env vars.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
