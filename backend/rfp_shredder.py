@@ -54,6 +54,25 @@ def _get_llm(max_tokens: int = 8000):
     return _llm
 
 
+def _text_of(resp) -> str:
+    """Coerce an LLM response to plain text. Newer Claude models return
+    `content` as a list of content blocks rather than a string."""
+    c = getattr(resp, "content", resp)
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        parts = []
+        for b in c:
+            if isinstance(b, str):
+                parts.append(b)
+            elif isinstance(b, dict):
+                parts.append(b.get("text") or b.get("content") or "")
+            else:
+                parts.append(getattr(b, "text", "") or "")
+        return "".join(parts)
+    return str(c or "")
+
+
 def _extract_json(text: str):
     """Parse a JSON object/array from an LLM response, tolerating code fences."""
     if not text:
@@ -64,8 +83,8 @@ def _extract_json(text: str):
         return json.loads(t)
     except Exception:
         pass
-    # Fall back to the first {...} or [...] block.
-    for pat in (r"\[.*\]", r"\{.*\}"):
+    # Fall back to the first {...} or [...] block (prefer object — our top level).
+    for pat in (r"\{.*\}", r"\[.*\]"):
         m = re.search(pat, t, re.DOTALL)
         if m:
             try:
@@ -126,8 +145,10 @@ AGENCY: {agency or 'Unknown'}
 SOLICITATION TEXT:
 {_clip(rfp_text, 45000)}
 """
-    resp = await _get_llm(8000).ainvoke([HumanMessage(content=f"{SHRED_SYSTEM}\n\n{prompt}")])
-    data = _extract_json(resp.content) or {}
+    resp = await _get_llm(16000).ainvoke([HumanMessage(content=f"{SHRED_SYSTEM}\n\n{prompt}")])
+    data = _extract_json(_text_of(resp)) or {}
+    if isinstance(data, list):          # model returned just the array
+        data = {"requirements": data}
     reqs = data.get("requirements") or []
     # Normalize + guarantee stable ids.
     for i, r in enumerate(reqs, 1):
@@ -153,62 +174,87 @@ ANALYZE_SYSTEM = (
 )
 
 
-async def analyze(requirements: List[dict], user_docs: List[dict]) -> dict:
-    """Score each requirement against the user's documents → compliance matrix.
+def _norm_status(s, coverage=None):
+    """Map whatever word the model used onto our three-state enum."""
+    s = str(s or "").strip().lower()
+    if s in ("addressed", "met", "full", "fully addressed", "compliant", "complete", "yes", "strong"):
+        return "addressed"
+    if s in ("partial", "partially addressed", "weak", "partially", "some", "minimal"):
+        return "partial"
+    if s in ("missing", "not addressed", "none", "no", "absent", "not met", "not evaluated"):
+        return "missing"
+    # Unknown label → infer from coverage if we have it.
+    if isinstance(coverage, (int, float)):
+        return "addressed" if coverage >= 80 else "partial" if coverage >= 30 else "missing"
+    return "partial"
 
-    user_docs: [{"name": str, "text": str}]  (already parsed)
-    Returns {"matrix": [...], "coverage_pct": int, "counts": {...}}
-    """
-    req_lines = "\n".join(
-        f'- {r["id"]} [{r.get("category","")}] {r["text"]}' for r in requirements
-    )
-    docs_blob = "\n\n".join(
-        f'### DOCUMENT: {d["name"]}\n{_clip(d.get("text",""), 12000)}' for d in user_docs
-    ) or "(no documents provided)"
 
+def _coerce_coverage(v, status=None):
+    try:
+        return max(0, min(100, int(round(float(v)))))
+    except Exception:
+        # coverage was a word like "Full"/"None" or absent → derive from status.
+        return {"addressed": 90, "partial": 55, "missing": 5}.get(status, 0)
+
+
+async def _score_batch(batch: List[dict], docs_blob: str) -> List[dict]:
+    req_lines = "\n".join(f'- {r["id"]} [{r.get("category","")}] {r["text"]}' for r in batch)
     prompt = f"""Compare the offeror's documents against each requirement and return ONLY valid JSON:
-{{
-  "matrix": [
-    {{
-      "id": "R1",
-      "status": "addressed | partial | missing",
-      "coverage": 0-100,
-      "doc": "name of the document that addresses it, or null",
-      "evidence": "short quote from the offeror's doc that supports it, or null",
-      "note": "one line: what's strong, or exactly what's missing/weak"
-    }}
-  ]
-}}
+{{"matrix": [{{"id": "R1", "status": "addressed" | "partial" | "missing", "coverage": <integer 0-100>, "doc": "<filename or null>", "evidence": "<=15-word quote or null", "note": "<one short line: strength, or exactly what's missing>"}}]}}
 
-Scoring:
-- "addressed" (coverage 80-100): the docs clearly and specifically satisfy the requirement.
-- "partial" (coverage 30-79): touched but weak, generic, or missing specifics the evaluator wants.
-- "missing" (coverage 0-29): not found in any document.
-- Judge against the requirement's intent, not just keywords. Be honest — unearned "addressed" ratings help no one.
-- Include EVERY requirement id exactly once.
+Rules:
+- "status" MUST be exactly one of: addressed, partial, missing. "coverage" MUST be an integer 0-100 (not a word).
+- addressed = 80-100 (clearly satisfied), partial = 30-79 (touched but weak/generic), missing = 0-29 (not found).
+- Judge intent, not keywords. Be honest. Include EVERY requirement id below exactly once. Keep evidence/note short.
 
 REQUIREMENTS:
 {req_lines}
 
 OFFEROR'S DOCUMENTS:
-{_clip(docs_blob, 90000)}
+{docs_blob}
 """
     resp = await _get_llm(8000).ainvoke([HumanMessage(content=f"{ANALYZE_SYSTEM}\n\n{prompt}")])
-    data = _extract_json(resp.content) or {}
-    matrix = data.get("matrix") or []
+    data = _extract_json(_text_of(resp)) or {}
+    return data.get("matrix") or []
 
-    by_id = {str(m.get("id")): m for m in matrix}
+
+async def analyze(requirements: List[dict], user_docs: List[dict], batch_size: int = 12) -> dict:
+    """Score each requirement against the user's documents → compliance matrix.
+
+    Requirements are scored in batches so the JSON never truncates on long
+    solicitations. user_docs: [{"name": str, "text": str}] (already parsed).
+    """
+    import asyncio
+    docs_blob = _clip("\n\n".join(
+        f'### DOCUMENT: {d["name"]}\n{_clip(d.get("text",""), 12000)}' for d in user_docs
+    ) or "(no documents provided)", 90000)
+
+    batches = [requirements[i:i + batch_size] for i in range(0, len(requirements), batch_size)]
+    results = await asyncio.gather(*[_score_batch(b, docs_blob) for b in batches], return_exceptions=True)
+
+    by_id = {}
+    for res in results:
+        if isinstance(res, Exception):
+            continue
+        for m in res:
+            by_id[str(m.get("id"))] = m
+
     out = []
     for r in requirements:
-        m = by_id.get(r["id"], {"id": r["id"], "status": "missing", "coverage": 0,
-                                "doc": None, "evidence": None, "note": "Not evaluated."})
-        m["id"] = r["id"]
-        m["status"] = m.get("status", "missing")
-        try:
-            m["coverage"] = max(0, min(100, int(m.get("coverage", 0))))
-        except Exception:
-            m["coverage"] = 0
-        out.append(m)
+        m = by_id.get(r["id"])
+        if not m:
+            out.append({"id": r["id"], "status": "missing", "coverage": 0,
+                        "doc": None, "evidence": None, "note": "Not evaluated."})
+            continue
+        status = _norm_status(m.get("status"), m.get("coverage"))
+        out.append({
+            "id": r["id"],
+            "status": status,
+            "coverage": _coerce_coverage(m.get("coverage"), status),
+            "doc": m.get("doc") or None,
+            "evidence": m.get("evidence") or None,
+            "note": m.get("note") or "",
+        })
 
     counts = {
         "addressed": sum(1 for m in out if m["status"] == "addressed"),
@@ -265,7 +311,7 @@ OFFEROR'S EXISTING CONTENT (this is the ONLY factual basis you may use):
 
 Remember: reorganize and sharpen their real content; never fabricate qualifications. If content is missing, say so in warnings instead of inventing."""
     resp = await _get_llm(4000).ainvoke([HumanMessage(content=f"{STRENGTHEN_SYSTEM}\n\n{prompt}")])
-    data = _extract_json(resp.content) or {}
+    data = _extract_json(_text_of(resp)) or {}
     return {
         "requirement_id": requirement.get("id", ""),
         "rewritten": data.get("rewritten", ""),
