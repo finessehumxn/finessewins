@@ -68,3 +68,13 @@ services:
         sync: false
       - key: VITE_API_URL
         value: https://finessewins-api.onrender.com
+
+  # ── Landing / marketing site (plain static HTML) ───────────────
+  # The notary/legal-themed "The bid, won." page + its logo assets.
+  # This is the public www.finessewins.com marketing site.
+  - type: web
+    name: finessewins-web
+    runtime: static
+    rootDir: landing
+    buildCommand: "echo 'static site — no build step'"
+    staticPublishPath: .
