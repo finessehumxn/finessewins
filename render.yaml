@@ -42,7 +42,7 @@ services:
       - key: STRIPE_ORG_PRICE_ID
         sync: false
       - key: CORS_ORIGINS
-        value: https://finessewins.com,https://app.finessewins.com
+        value: https://finessewins.com,https://app.finessewins.com,https://finessewins-app.onrender.com
       - key: FINESSEWINS_APP_URL
         value: https://app.finessewins.com
       - key: FINESSEWINS_HIDE_SAMPLE
