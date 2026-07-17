@@ -328,6 +328,8 @@ async def rfp_shred(
         result = await rfp_shredder.shred(doc.text, title=title or doc.filename, agency=agency)
     except rfp_shredder.ShredderUnavailable as e:
         raise HTTPException(503, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"Shred failed: {type(e).__name__}: {str(e)[:400]}")
     result["rfp"] = {"filename": doc.filename, "words": doc.word_count, "pages": doc.pages,
                      "sections": [s.heading for s in doc.sections[:40]]}
     return result
@@ -357,6 +359,8 @@ async def rfp_analyze(
         result = await rfp_shredder.analyze(reqs, docs)
     except rfp_shredder.ShredderUnavailable as e:
         raise HTTPException(503, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"Analyze failed: {type(e).__name__}: {str(e)[:400]}")
     # Return parsed text so the client can feed the right content to /strengthen.
     result["docs"] = [{"name": d["name"], "text": d["text"], "words": len(d["text"].split())} for d in docs]
     return result
@@ -382,6 +386,8 @@ async def rfp_strengthen(req: StrengthenReq, user=Depends(optional_user), _rl=De
         )
     except rfp_shredder.ShredderUnavailable as e:
         raise HTTPException(503, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"Strengthen failed: {type(e).__name__}: {str(e)[:400]}")
 
 
 class MatrixExport(BaseModel):
