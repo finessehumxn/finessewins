@@ -182,6 +182,22 @@ async def root():
         "persistence": "supabase" if supabase_enabled() else "in-memory (dev)",
     }
 
+@app.get("/api/debug/anthropic-key")
+async def _debug_anthropic_key():
+    """TEMPORARY diagnostic — reports the key FINGERPRINT only (never the key).
+    Remove after verifying prod config."""
+    k = os.environ.get("ANTHROPIC_API_KEY", "")
+    return {
+        "present": bool(k),
+        "length": len(k),
+        "prefix": k[:14],
+        "suffix": k[-4:] if len(k) > 8 else "",
+        "has_leading_or_trailing_space": k != k.strip(),
+        "has_quotes": k.startswith(('"', "'")) or k.endswith(('"', "'")),
+        "model": os.environ.get("ANTHROPIC_MODEL", "(default)"),
+    }
+
+
 @app.get("/api/health")
 async def health():
     return {"ok": True, "auth_enabled": auth_enabled(), "db": supabase_enabled()}
