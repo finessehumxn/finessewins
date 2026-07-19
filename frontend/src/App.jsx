@@ -7,6 +7,7 @@ import Alerts from "./pages/Alerts"
 import Advisor from "./pages/Advisor"
 import BidIQ from "./pages/BidIQ"
 import Toolkit from "./pages/Toolkit"
+import GetRegistered from "./pages/GetRegistered"
 import RfpShredder from "./pages/RfpShredder"
 import Profile from "./pages/Profile"
 import Pricing from "./pages/Pricing"
@@ -74,6 +75,7 @@ export default function App() {
           {page === "advisor"      && <Advisor onNavigate={navigate} />}
           {page === "toolkit"      && <Toolkit onNavigate={navigate} />}
           {page === "rfp-shredder" && <RfpShredder onNavigate={navigate} />}
+          {page === "get-registered" && <GetRegistered onNavigate={navigate} />}
           {page === "pricing"      && <Pricing onNavigate={navigate} />}
           {page === "profile"      && <Profile onNavigate={navigate} />}
         </ErrorBoundary>

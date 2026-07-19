@@ -4,6 +4,7 @@ import { LogoMark } from "./Logo"
 
 const NAV = [
   { id: "dashboard",     label: "Dashboard",       icon: "⊞" },
+  { id: "get-registered", label: "Get Registered",   icon: "🪪" },
   { id: "opportunities", label: "Find Bids",        icon: "🔍" },
   { id: "intel",         label: "Bid IQ",           icon: "📊" },
   { id: "alerts",        label: "Bid Radar",        icon: "📡" },
