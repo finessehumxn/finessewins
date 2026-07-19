@@ -285,6 +285,84 @@ async def delete_proposal(proposal_id: str, user: User = Depends(require_user)):
     await store.delete(proposal_id, user_id=user.id)
     return {"deleted": proposal_id}
 
+
+# ── WIN / LOSS TRACKING + ANALYTICS ──────────────────────────────
+# Closing the loop: a bidder records what actually happened, which powers their
+# hit-rate analytics AND builds the proprietary outcome data no competitor has.
+
+OUTCOMES = ("submitted", "won", "lost", "no_bid")
+
+
+class OutcomeReq(BaseModel):
+    outcome: str                       # submitted | won | lost | no_bid
+    award_value: Optional[float] = None
+    notes: Optional[str] = None
+
+
+@app.post("/api/proposal/{proposal_id}/outcome")
+async def set_proposal_outcome(proposal_id: str, req: OutcomeReq, user: User = Depends(require_user)):
+    """Record what actually happened to a bid."""
+    if req.outcome not in OUTCOMES:
+        raise HTTPException(400, f"outcome must be one of: {', '.join(OUTCOMES)}")
+    proposal = await store.get(proposal_id, user_id=user.id)
+    if not proposal:
+        raise HTTPException(404, "Proposal not found")
+    updates = {
+        "outcome": req.outcome,
+        "award_value": req.award_value if req.outcome == "won" else None,
+        "outcome_notes": req.notes,
+        "outcome_at": datetime.utcnow().isoformat(),
+    }
+    await store.update(proposal_id, updates)
+    return {"proposal_id": proposal_id, **updates}
+
+
+def _rate(won: int, lost: int) -> Optional[int]:
+    decided = won + lost
+    return round(won / decided * 100) if decided else None
+
+
+@app.get("/api/analytics/winloss")
+async def winloss_analytics(user: User = Depends(require_user)):
+    """Hit rate, dollars won, and where this bidder actually wins."""
+    rows = await store.list_all(user_id=user.id)
+
+    def bucket(key_fn):
+        out = {}
+        for r in rows:
+            k = (key_fn(r) or "Unspecified").strip() or "Unspecified"
+            b = out.setdefault(k, {"key": k, "bids": 0, "won": 0, "lost": 0, "dollars": 0.0})
+            b["bids"] += 1
+            if r.get("outcome") == "won":
+                b["won"] += 1
+                b["dollars"] += float(r.get("award_value") or 0)
+            elif r.get("outcome") == "lost":
+                b["lost"] += 1
+        for b in out.values():
+            b["win_rate"] = _rate(b["won"], b["lost"])
+        return sorted(out.values(), key=lambda b: (-b["won"], -b["bids"]))[:10]
+
+    won = sum(1 for r in rows if r.get("outcome") == "won")
+    lost = sum(1 for r in rows if r.get("outcome") == "lost")
+    submitted = sum(1 for r in rows if r.get("outcome") == "submitted")
+    no_bid = sum(1 for r in rows if r.get("outcome") == "no_bid")
+    undecided = sum(1 for r in rows if not r.get("outcome"))
+    dollars_won = sum(float(r.get("award_value") or 0) for r in rows if r.get("outcome") == "won")
+
+    return {
+        "totals": {
+            "proposals": len(rows), "won": won, "lost": lost,
+            "submitted_awaiting": submitted, "no_bid": no_bid, "undecided": undecided,
+        },
+        "win_rate": _rate(won, lost),
+        "decided": won + lost,
+        "dollars_won": round(dollars_won, 2),
+        "avg_award": round(dollars_won / won, 2) if won else None,
+        "by_agency": bucket(lambda r: r.get("agency")),
+        "by_naics": bucket(lambda r: r.get("naics_code")),
+        "by_set_aside": bucket(lambda r: r.get("set_aside") or "Full & Open"),
+    }
+
 @app.get("/api/proposal/{proposal_id}/export")
 async def export_proposal(proposal_id: str, user: User = Depends(require_user)):
     """Export a proposal to a real .docx (submission-ready)."""

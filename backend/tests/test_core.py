@@ -35,6 +35,37 @@ def test_naics_name_exact_and_sector():
     assert naics_data.naics_name(None) is None
 
 
+def test_winloss_analytics():
+    import main
+    rows = [
+        {"user_id": "wl1", "agency": "AZ DCS", "naics_code": "624110", "set_aside": "WOSB", "outcome": "won", "award_value": 85000},
+        {"user_id": "wl1", "agency": "AZ DCS", "naics_code": "624110", "set_aside": "WOSB", "outcome": "lost"},
+        {"user_id": "wl1", "agency": "City of Chandler", "naics_code": "541611", "outcome": "won", "award_value": 40000},
+        {"user_id": "wl1", "agency": "City of Chandler", "naics_code": "541611", "outcome": "submitted"},
+        {"user_id": "wl1", "agency": "VA", "naics_code": "541512", "outcome": None},
+    ]
+    for i, r in enumerate(rows):
+        run(db.proposals.create(f"wl{i}", r))
+
+    class U:
+        id = "wl1"
+    res = run(main.winloss_analytics(U()))
+
+    assert res["totals"] == {"proposals": 5, "won": 2, "lost": 1,
+                             "submitted_awaiting": 1, "no_bid": 0, "undecided": 1}
+    assert res["win_rate"] == 67          # 2 of 3 decided bids
+    assert res["dollars_won"] == 125000
+    assert res["avg_award"] == 62500
+    # agencies ranked by wins, with per-agency rate
+    top = res["by_agency"][0]
+    assert top["won"] == 1 and top["win_rate"] in (50, 100)
+    # a bidder with no decided bids gets a null rate rather than a divide-by-zero
+    class U2:
+        id = "nobody"
+    empty = run(main.winloss_analytics(U2()))
+    assert empty["win_rate"] is None and empty["decided"] == 0
+
+
 def test_docparse_docx_sections_and_text():
     import io, docx, docparse
     d = docx.Document()

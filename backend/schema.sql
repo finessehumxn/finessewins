@@ -55,6 +55,11 @@ create table if not exists public.proposals (
     analysis            jsonb,
     review              jsonb,
     error               text,
+    -- bid outcome tracking (win/loss analytics)
+    outcome             text,          -- submitted|won|lost|no_bid  (null = not yet decided)
+    award_value         numeric,       -- dollars, when won
+    outcome_notes       text,
+    outcome_at          timestamptz,
     created_at          timestamptz not null default now(),
     completed_at        timestamptz
 );
@@ -181,3 +186,14 @@ create policy "own tracked" on public.tracked_solicitations
 -- Note: the FastAPI backend uses the SERVICE ROLE key, which bypasses RLS. The
 -- backend enforces the same scoping in code (every query filters by user_id from
 -- the verified JWT). RLS is the second line of defense for any direct client access.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRATIONS (idempotent — safe to re-run this whole file on an existing DB)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- 2026-07: bid outcome tracking for win/loss analytics
+alter table public.proposals add column if not exists outcome       text;
+alter table public.proposals add column if not exists award_value   numeric;
+alter table public.proposals add column if not exists outcome_notes text;
+alter table public.proposals add column if not exists outcome_at    timestamptz;
+create index if not exists proposals_outcome_idx on public.proposals (user_id, outcome);

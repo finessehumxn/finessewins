@@ -38,30 +38,54 @@ const toRow = (p) => ({
   status: p.status || "complete",
   deadline: p.deadline || null,
   value: p.set_aside || "Full & Open",
+  outcome: p.outcome || null,
 })
+
+const OUTCOME_STYLE = {
+  won:       { label: "Won",  color: "#1DB954" },
+  lost:      { label: "Lost", color: "#FF6432" },
+  submitted: { label: "Sent", color: "#1FB6EE" },
+}
 
 export default function Dashboard({ onNavigate }) {
   const [filter, setFilter] = useState("all")
   const [proposals, setProposals] = useState([])
   const [profile, setProfile] = useState(null)
+  const [analytics, setAnalytics] = useState(null)
+  const [savingOutcome, setSavingOutcome] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  const load = () => Promise.all([
+    apiJson("/api/proposals").catch(() => ({ proposals: [] })),
+    apiJson("/api/profile").catch(() => null),
+    apiJson("/api/analytics/winloss").catch(() => null),
+  ]).then(([list, prof, stats]) => {
+    setProposals(Array.isArray(list?.proposals) ? list.proposals.map(toRow) : [])
+    setProfile(prof || null)
+    setAnalytics(stats || null)
+  })
+
   useEffect(() => {
     let alive = true
-    Promise.all([
-      apiJson("/api/proposals").catch(() => ({ proposals: [] })),
-      apiJson("/api/profile").catch(() => null),
-    ])
-      .then(([list, prof]) => {
-        if (!alive) return
-        setProposals(Array.isArray(list?.proposals) ? list.proposals.map(toRow) : [])
-        setProfile(prof || null)
-      })
+    load()
       .catch((e) => { if (alive) setError(e.message) })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [])
+
+  // Record what actually happened to a bid — this is what powers the track record.
+  async function setOutcome(id, outcome, e) {
+    e?.stopPropagation()
+    setSavingOutcome(id)
+    try {
+      await apiJson(`/api/proposal/${id}/outcome`, {
+        method: "POST",
+        body: JSON.stringify({ outcome }),
+      })
+      await load()
+    } catch (err) { setError(err.message) } finally { setSavingOutcome(null) }
+  }
 
   const filtered = proposals.filter(p => filter === "all" || p.status === filter)
 
@@ -112,6 +136,43 @@ export default function Dashboard({ onNavigate }) {
           </div>
         ))}
       </div>
+
+      {/* Track record — the loop closed: what actually happened */}
+      {analytics && analytics.decided > 0 && (
+        <div style={{ background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12, padding: "1.35rem", marginBottom: "2rem", display: "flex", gap: "2rem", alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "2.1rem", fontWeight: 900, color: analytics.win_rate >= 50 ? "#1DB954" : "#F8C81C", lineHeight: 1 }}>
+              {analytics.win_rate ?? "—"}%
+            </div>
+            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".55rem", letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", marginTop: ".3rem" }}>Win rate</div>
+          </div>
+          <div style={{ borderLeft: "1px solid rgba(255,255,255,.1)", paddingLeft: "1.5rem" }}>
+            <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.05rem", fontWeight: 700 }}>
+              <span style={{ color: "#1DB954" }}>{analytics.totals.won}W</span>
+              <span style={{ color: "rgba(255,255,255,.3)" }}> · </span>
+              <span style={{ color: "#FF6432" }}>{analytics.totals.lost}L</span>
+            </div>
+            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".6rem", color: "rgba(255,255,255,.4)", marginTop: ".2rem" }}>
+              {analytics.totals.submitted_awaiting} awaiting result
+            </div>
+          </div>
+          <div style={{ borderLeft: "1px solid rgba(255,255,255,.1)", paddingLeft: "1.5rem" }}>
+            <div style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.15rem", fontWeight: 900, color: "#F8C81C" }}>
+              ${Number(analytics.dollars_won || 0).toLocaleString()}
+            </div>
+            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".6rem", color: "rgba(255,255,255,.4)", marginTop: ".2rem" }}>Contract value won</div>
+          </div>
+          {analytics.by_agency?.[0]?.won > 0 && (
+            <div style={{ borderLeft: "1px solid rgba(255,255,255,.1)", paddingLeft: "1.5rem", flex: 1, minWidth: 170 }}>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".55rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#1FB6EE", marginBottom: ".25rem" }}>You win most with</div>
+              <div style={{ fontSize: ".88rem", color: "#fff" }}>{analytics.by_agency[0].key}</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".6rem", color: "rgba(255,255,255,.4)" }}>
+                {analytics.by_agency[0].won} of {analytics.by_agency[0].bids} bids
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filter + New Proposal */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
@@ -218,7 +279,29 @@ export default function Dashboard({ onNavigate }) {
                   letterSpacing: ".08em", textTransform: "uppercase"
                 }}>{status.label}</span>
               </div>
-              <div style={{ alignSelf: "center", color: "rgba(255,255,255,.25)", fontSize: ".9rem" }}>→</div>
+              <div style={{ alignSelf: "center", display: "flex", gap: ".3rem", alignItems: "center" }}>
+                {/* record what actually happened — clicks don't open the proposal */}
+                {["won", "lost", "submitted"].map(o => {
+                  const on = p.outcome === o
+                  const st = OUTCOME_STYLE[o]
+                  return (
+                    <button key={o} title={`Mark ${st.label}`} disabled={savingOutcome === p.id}
+                      onClick={(e) => setOutcome(p.id, o, e)}
+                      style={{
+                        background: on ? `${st.color}22` : "transparent",
+                        border: `1px solid ${on ? st.color : "rgba(255,255,255,.12)"}`,
+                        color: on ? st.color : "rgba(255,255,255,.35)",
+                        fontFamily: "'DM Mono', monospace", fontSize: ".55rem",
+                        letterSpacing: ".06em", textTransform: "uppercase",
+                        padding: ".2rem .45rem", borderRadius: 4,
+                        cursor: savingOutcome === p.id ? "wait" : "pointer", fontWeight: on ? 700 : 400,
+                      }}>
+                      {st.label}
+                    </button>
+                  )
+                })}
+                <span style={{ color: "rgba(255,255,255,.25)", fontSize: ".9rem", marginLeft: ".2rem" }}>→</span>
+              </div>
             </div>
           )
         })}
