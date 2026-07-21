@@ -72,6 +72,9 @@ h2{font-family:var(--serif);font-weight:400;font-size:clamp(1.9rem,4vw,2.6rem);c
 .eval-facts{border-left:3px solid var(--gold);padding-left:1.4rem;font-family:var(--mono);font-size:.8rem;line-height:2.1;color:var(--navy)}
 @media(max-width:760px){.eval{grid-template-columns:1fr}}
 
+/* find vs win comparison */
+@media(max-width:640px){.vsgrid{grid-template-columns:1fr !important}}
+
 /* submission band */
 .submit{background:var(--navy);color:var(--paper);border-top:none;padding:4.5rem 0}
 .submit .doclabel{color:var(--ice)}
@@ -128,9 +131,43 @@ footer a:hover{text-decoration:underline}
     </div>
   </section>
 
+  <section id="findvswin">
+    <div class="wrap">
+      <div class="doclabel">Section 2 · Scope of award — find vs. win</div>
+      <h2>Anyone can hand you a list of bids. We hand you a submitted one.</h2>
+      <p style="max-width:64ch;font-size:.98rem;color:#3B4256;margin:-1rem 0 2.25rem">The market is full of bid <em>search engines</em> — millions of listings, saved searches, a digest in your inbox every morning. For a first-time bidder, a list of a million RFPs isn't a strategy; it's overwhelm. Finding the bid is the easy 10%. FinesseWins does the other 90% — the part that actually wins the work.</p>
+
+      <div class="vsgrid" style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);border:1px solid var(--rule)">
+        <div style="background:var(--paper);padding:1.9rem">
+          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:#6B7390;margin-bottom:1.1rem">Bid search &amp; discovery tools</div>
+          <ul style="list-style:none;display:grid;gap:.7rem;font-size:.92rem;color:#3B4256">
+            <li>✓ Search millions of RFPs</li>
+            <li>✓ Filter by state, NAICS, set-aside</li>
+            <li>✓ Pull deadlines out of a listing</li>
+            <li>✓ Email you a daily digest</li>
+          </ul>
+          <div style="margin-top:1.4rem;padding-top:1.1rem;border-top:1px dashed var(--rule);font-family:var(--serif);font-size:1.15rem;font-style:italic;color:#6B7390">…then you're on your own.</div>
+        </div>
+        <div style="background:#FCFBF4;padding:1.9rem;border-left:3px solid var(--gold)">
+          <div style="font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);margin-bottom:1.1rem">FinesseWins</div>
+          <ul style="list-style:none;display:grid;gap:.7rem;font-size:.92rem;color:var(--ink)">
+            <li><strong style="color:var(--navy)">Everything on the left — plus:</strong></li>
+            <li>★ Score your real odds <em>before</em> you write</li>
+            <li>★ Shred the RFP into a compliance matrix</li>
+            <li>★ Strengthen <em>your own</em> documents to the solicitation</li>
+            <li>★ Draft the proposal — even with zero past performance</li>
+            <li>★ Track what you actually won</li>
+          </ul>
+          <div style="margin-top:1.4rem;padding-top:1.1rem;border-top:1px dashed rgba(30,39,97,.2);font-family:var(--serif);font-size:1.15rem;font-style:italic;color:var(--navy)">…all the way to submitted.</div>
+        </div>
+      </div>
+      <p style="margin-top:1.5rem;font-family:var(--mono);font-size:.74rem;letter-spacing:.03em;color:#6B7390">Finding the opportunity is table stakes. <span style="color:var(--navy)">Winning it is the product.</span></p>
+    </div>
+  </section>
+
   <section id="eligibility">
     <div class="wrap">
-      <div class="doclabel">Section 2 · Eligibility</div>
+      <div class="doclabel">Section 3 · Eligibility</div>
       <h2>Built for the set-asides.</h2>
       <div class="chips">
         <span class="chip">WOSB</span><span class="chip">MBE</span><span class="chip">DBE</span>
@@ -146,7 +183,7 @@ footer a:hover{text-decoration:underline}
 
   <section id="evaluation">
     <div class="wrap">
-      <div class="doclabel">Section 3 · Evaluation criteria — why us</div>
+      <div class="doclabel">Section 4 · Evaluation criteria — why us</div>
       <h2>We bid on government work every month. This is our own playbook.</h2>
       <div class="eval">
         <div>
@@ -166,7 +203,7 @@ footer a:hover{text-decoration:underline}
 
   <section class="submit" id="purchase">
     <div class="wrap">
-      <div class="doclabel">Section 4 · Submission — purchase</div>
+      <div class="doclabel">Section 5 · Submission — purchase</div>
       <h2>Your first win starts with one email.</h2>
       <p>FinesseWins is available for individuals, businesses, and the organizations that support them. Start on the free tier, upgrade when you're winning — and the first 50 paid members lock their rate for life.</p>
       <div style="display:inline-block;margin-top:1.25rem;border:1.5px solid var(--gold);border-radius:3px;padding:.5rem 1rem;font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold)">Founding members · First 50 paid subscribers lock their rate for life</div>
@@ -204,7 +241,6 @@ footer a:hover{text-decoration:underline}
       </div>
       <p style="margin-top:1.5rem;font-family:var(--mono);font-size:.72rem">Questions first? Write to <a class="mail" href="mailto:contact@millennialscreatives.com">contact@millennialscreatives.com</a></p>
     </div>
-  </section>
   </section>
 </main>
 

@@ -2,18 +2,20 @@ import { useState, useEffect } from "react"
 import { apiJson } from "../lib/api"
 import { LogoMark } from "./Logo"
 
+// Ordered to lead with WINNING (shred → strengthen → write → odds), the wedge
+// that discovery tools don't touch, before the commoditized "find" layer.
 const NAV = [
-  { id: "dashboard",     label: "Dashboard",       icon: "⊞" },
-  { id: "get-registered", label: "Get Registered",   icon: "🪪" },
-  { id: "opportunities", label: "Find Bids",        icon: "🔍" },
-  { id: "intel",         label: "Bid IQ",           icon: "📊" },
-  { id: "alerts",        label: "Bid Radar",        icon: "📡" },
-  { id: "rfp-shredder",  label: "RFP Shredder",     icon: "📄" },
-  { id: "new-proposal",  label: "New Proposal",     icon: "✦" },
-  { id: "toolkit",       label: "Toolkit",          icon: "🧰" },
-  { id: "advisor",       label: "Advisor Console",  icon: "🏛" },
-  { id: "pricing",       label: "Pricing",          icon: "💳" },
-  { id: "profile",       label: "Company Profile",  icon: "◎" },
+  { id: "dashboard",     label: "Dashboard",       icon: "⊞",  group: "" },
+  { id: "get-registered", label: "Get Registered",  icon: "🪪", group: "Start here" },
+  { id: "rfp-shredder",  label: "RFP Shredder",     icon: "📄", group: "Win the bid" },
+  { id: "new-proposal",  label: "New Proposal",     icon: "✦",  group: "Win the bid" },
+  { id: "intel",         label: "Bid IQ",           icon: "📊", group: "Win the bid" },
+  { id: "toolkit",       label: "Toolkit",          icon: "🧰", group: "Win the bid" },
+  { id: "opportunities", label: "Find Bids",        icon: "🔍", group: "Find the bid" },
+  { id: "alerts",        label: "Bid Radar",        icon: "📡", group: "Find the bid" },
+  { id: "advisor",       label: "Advisor Console",  icon: "🏛", group: "For advisors" },
+  { id: "pricing",       label: "Pricing",          icon: "💳", group: "Account" },
+  { id: "profile",       label: "Company Profile",  icon: "◎",  group: "Account" },
 ]
 
 const PLAN_LABELS = { free: "Free Trial", solo: "Solo", pro: "Pro", agency: "Agency" }
@@ -57,11 +59,18 @@ export default function Sidebar({ currentPage, onNavigate, userEmail, onSignOut 
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1 }}>
-        {NAV.map(item => {
+      <nav style={{ flex: 1, overflowY: "auto" }}>
+        {NAV.map((item, i) => {
           const active = currentPage === item.id
+          const showGroup = item.group && item.group !== NAV[i - 1]?.group
           return (
-            <button key={item.id} onClick={() => onNavigate(item.id)}
+            <div key={item.id}>
+            {showGroup && (
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".5rem", letterSpacing: ".18em", textTransform: "uppercase", color: "rgba(255,255,255,.28)", padding: "0.9rem 1.5rem .35rem" }}>
+                {item.group}
+              </div>
+            )}
+            <button onClick={() => onNavigate(item.id)}
               style={{
                 display: "flex", alignItems: "center", gap: ".75rem",
                 width: "100%", padding: ".75rem 1.5rem", border: "none",
@@ -80,6 +89,7 @@ export default function Sidebar({ currentPage, onNavigate, userEmail, onSignOut 
                 </span>
               )}
             </button>
+            </div>
           )
         })}
       </nav>
