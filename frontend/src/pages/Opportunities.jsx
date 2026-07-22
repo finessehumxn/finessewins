@@ -17,6 +17,8 @@ export default function Opportunities({ onNavigate }) {
   const [sourceReport, setSourceReport] = useState([]) // per-source counts after a search
   const [allSources, setAllSources] = useState([])     // every site we search
   const [scores, setScores] = useState({})             // winnability score per result id
+  const [savedSearches, setSavedSearches] = useState([])
+  const [savingSearch, setSavingSearch] = useState(false)
 
   const daysUntil = d => (d ? Math.ceil((new Date(d) - new Date()) / 86400000) : null)
 
@@ -26,18 +28,50 @@ export default function Opportunities({ onNavigate }) {
     apiJson("/api/opportunities/sources")
       .then(({ sources }) => { if (alive && sources) setAllSources(sources) })
       .catch(() => {})
+    apiJson("/api/searches")
+      .then(({ searches }) => { if (alive && searches) setSavedSearches(searches) })
+      .catch(() => {})   // signed out / no table yet — saved searches just stay hidden
     return () => { alive = false }
   }, [])
 
-  const doSearch = async () => {
+  // ── saved searches ───────────────────────────────────────────
+  const saveCurrentSearch = async () => {
+    if (!search && !naics && !setAside) { setError("Enter a keyword, NAICS code, or set-aside first."); return }
+    const suggested = [search, naics, setAside].filter(Boolean).join(" · ").slice(0, 40)
+    const name = window.prompt("Name this search", suggested)
+    if (!name) return
+    setSavingSearch(true); setError(null)
+    try {
+      const { search: row } = await apiJson("/api/searches", {
+        method: "POST",
+        body: JSON.stringify({ name, keywords: search || null, naics_code: naics || null, set_aside: setAside || null }),
+      })
+      setSavedSearches(list => [row, ...list])
+    } catch (e) { setError(e.message) } finally { setSavingSearch(false) }
+  }
+
+  const runSavedSearch = async (s) => {
+    setSearch(s.keywords || ""); setNaics(s.naics_code || ""); setSetAside(s.set_aside || "")
+    apiJson(`/api/searches/${s.id}/run`, { method: "POST" }).catch(() => {})
+    // run with the saved values directly (state updates are async)
+    await doSearch({ keywords: s.keywords || "", naics_code: s.naics_code || null, set_aside: s.set_aside || null })
+  }
+
+  const deleteSavedSearch = async (id, e) => {
+    e?.stopPropagation()
+    setSavedSearches(list => list.filter(x => x.id !== id))
+    apiJson(`/api/searches/${id}`, { method: "DELETE" }).catch(() => {})
+  }
+
+  const doSearch = async (override) => {
     setLoading(true); setError(null); setSearched(true)
     try {
       const data = await apiJson("/api/opportunities/search", {
         method: "POST",
         body: JSON.stringify({
-          keywords: search || "technology services",
-          naics_code: naics || null,
-          set_aside: setAside || null,
+          keywords: (override?.keywords ?? search) || "technology services",
+          naics_code: override ? override.naics_code : (naics || null),
+          set_aside: override ? override.set_aside : (setAside || null),
           max_results: 40,
         })
       })
@@ -91,10 +125,26 @@ export default function Opportunities({ onNavigate }) {
           <option value="SBA">Small Business</option>
           <option value="8A">8(a)</option>
         </select>
-        <button onClick={doSearch} disabled={loading}
+        <button onClick={() => doSearch()} disabled={loading}
           style={{ background: "#EC1C7B", color: "#fff", border: "none", padding: ".75rem 1.5rem", fontFamily: "'DM Mono', monospace", fontSize: ".68rem", letterSpacing: ".1em", textTransform: "uppercase", cursor: "pointer", borderRadius: 6, fontWeight: 600, whiteSpace: "nowrap" }}>
           {loading ? "Searching..." : "Search →"}
         </button>
+      </div>
+
+      {/* Saved searches — the retention loop: set it up once, re-run forever */}
+      <div style={{ display: "flex", alignItems: "center", gap: ".5rem", flexWrap: "wrap", marginBottom: "1.5rem" }}>
+        <button onClick={saveCurrentSearch} disabled={savingSearch}
+          style={{ background: "none", border: "1px dashed rgba(255,255,255,.25)", color: "rgba(255,255,255,.6)", padding: ".35rem .8rem", borderRadius: 20, fontFamily: "'DM Mono', monospace", fontSize: ".6rem", letterSpacing: ".08em", textTransform: "uppercase", cursor: "pointer", whiteSpace: "nowrap" }}>
+          {savingSearch ? "Saving…" : "★ Save this search"}
+        </button>
+        {savedSearches.map(s => (
+          <span key={s.id} onClick={() => runSavedSearch(s)} title={[s.keywords, s.naics_code, s.set_aside].filter(Boolean).join(" · ")}
+            style={{ display: "inline-flex", alignItems: "center", gap: ".45rem", background: "rgba(31,182,238,.1)", border: "1px solid rgba(31,182,238,.3)", color: "#1FB6EE", padding: ".35rem .5rem .35rem .8rem", borderRadius: 20, fontSize: ".78rem", cursor: "pointer" }}>
+            {s.name}
+            <button onClick={(e) => deleteSavedSearch(s.id, e)} title="Remove"
+              style={{ background: "none", border: "none", color: "rgba(255,255,255,.35)", cursor: "pointer", fontSize: ".95rem", lineHeight: 1, padding: "0 .1rem" }}>×</button>
+          </span>
+        ))}
       </div>
 
       {/* Sources legend — every bid site we search, with live/curated + post-search counts */}
