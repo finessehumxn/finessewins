@@ -136,16 +136,17 @@ Return ONLY valid JSON with this exact shape:
 Rules:
 - Capture EVERY distinct requirement, submittal instruction, and evaluation factor. Aim for completeness (typically 15-40 items).
 - Keep each "text" one clear obligation. Split compound requirements.
-- "source" must be grounded in the document — a quote or a section number. Do not invent.
+- "source" must be grounded in the document — a SHORT quote (<=12 words) or a section number. Do not invent.
+- Keep every field terse. Do not pad. The whole JSON must fit well within the token budget.
 - Order: eligibility → submission/format (Section L) → evaluation factors (Section M) → scope/technical requirements.
 
 SOLICITATION TITLE: {title or 'Unknown'}
 AGENCY: {agency or 'Unknown'}
 
 SOLICITATION TEXT:
-{_clip(rfp_text, 45000)}
+{_clip(rfp_text, 38000)}
 """
-    resp = await _get_llm(16000).ainvoke([HumanMessage(content=f"{SHRED_SYSTEM}\n\n{prompt}")])
+    resp = await _get_llm(8000).ainvoke([HumanMessage(content=f"{SHRED_SYSTEM}\n\n{prompt}")])
     data = _extract_json(_text_of(resp)) or {}
     if isinstance(data, list):          # model returned just the array
         data = {"requirements": data}
