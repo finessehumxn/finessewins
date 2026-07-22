@@ -5,6 +5,8 @@ const CERTS = ["WOSB", "EDWOSB", "MBE", "DBE", "Black-Owned", "8a", "HUBZone", "
 const TABS = [
   { id: "cap", label: "Capability Statement", icon: "📄" },
   { id: "rfp", label: "RFP Explainer", icon: "📖" },
+  { id: "price", label: "Price Builder", icon: "🧮" },
+  { id: "gonogo", label: "Bid / No-Bid", icon: "⚖️" },
   { id: "cert", label: "Certification Check", icon: "✅" },
 ]
 
@@ -27,7 +29,9 @@ export default function Toolkit({ onNavigate }) {
         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".65rem", letterSpacing: ".15em", textTransform: "uppercase", color: "#EC1C7B", marginBottom: ".5rem" }}>Toolkit</div>
         <h1 style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.8rem", fontWeight: 900, margin: 0, letterSpacing: "-.02em" }}>Quick tools</h1>
         <p style={{ color: "rgba(255,255,255,.6)", fontSize: ".9rem", marginTop: ".6rem", maxWidth: 620 }}>
-          The essentials every first-time bidder needs — a polished capability statement, a plain-English read on any RFP, and a check of which certifications you qualify for.
+          The essentials every first-time bidder needs — a polished capability statement, a plain-English read on any RFP,
+          a real government cost build-up so you price to win, an honest bid/no-bid call before you burn a week, and a
+          check of which certifications you qualify for.
         </p>
       </div>
 
@@ -47,6 +51,8 @@ export default function Toolkit({ onNavigate }) {
         <div style={card}>
           {tab === "cap" && <CapabilityTool profile={profile} onNavigate={onNavigate} label={label} input={input} btn={btn} />}
           {tab === "rfp" && <RfpTool profile={profile} label={label} input={input} btn={btn} />}
+          {tab === "price" && <PriceBuilder label={label} input={input} btn={btn} />}
+          {tab === "gonogo" && <GoNoGo btn={btn} />}
           {tab === "cert" && <CertTool profile={profile} onNavigate={onNavigate} btn={btn} />}
         </div>
       )}
@@ -217,4 +223,194 @@ function _profileBody(p) {
     capabilities: p.capabilities || "", past_performance: p.past_performance || [],
     state: p.state || "AZ",
   }
+}
+
+/* ── PRICE BUILDER ────────────────────────────────────────────────
+   First-timers lose bids two ways on price: they guess low and win
+   unprofitable work, or guess high and never win. Agencies evaluate a
+   cost build-up (direct labor → fringe → overhead → G&A → fee), so this
+   builds the same stack and shows the fully burdened rate that results. */
+function PriceBuilder({ label, input, btn }) {
+  const [rows, setRows] = useState([{ title: "Project Lead", rate: 45, hours: 160 }])
+  const [fringe, setFringe] = useState(30)
+  const [overhead, setOverhead] = useState(25)
+  const [ga, setGa] = useState(12)
+  const [fee, setFee] = useState(8)
+  const [odc, setOdc] = useState(0)
+
+  const n = (v) => (isNaN(parseFloat(v)) ? 0 : parseFloat(v))
+  const money = (v) => "$" + v.toLocaleString(undefined, { maximumFractionDigits: 0 })
+
+  const directLabor = rows.reduce((s, r) => s + n(r.rate) * n(r.hours), 0)
+  const totalHours  = rows.reduce((s, r) => s + n(r.hours), 0)
+  const fringeAmt   = directLabor * (n(fringe) / 100)
+  const laborFringe = directLabor + fringeAmt
+  const ohAmt       = laborFringe * (n(overhead) / 100)
+  const subtotal    = laborFringe + ohAmt
+  const gaBase      = subtotal + n(odc)
+  const gaAmt       = gaBase * (n(ga) / 100)
+  const totalCost   = gaBase + gaAmt
+  const feeAmt      = totalCost * (n(fee) / 100)
+  const totalPrice  = totalCost + feeAmt
+  const burdened    = totalHours ? totalPrice / totalHours : 0
+  const multiplier  = directLabor ? totalPrice / directLabor : 0
+
+  const setRow = (i, k, v) => setRows(rs => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)))
+  const addRow = () => setRows(rs => [...rs, { title: "", rate: 0, hours: 0 }])
+  const delRow = (i) => setRows(rs => rs.filter((_, j) => j !== i))
+
+  const Line = ({ k, v, strong, tint }) => (
+    <div style={{ display: "flex", justifyContent: "space-between", padding: ".45rem 0", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+      <span style={{ fontSize: ".85rem", color: strong ? "#fff" : "rgba(255,255,255,.6)", fontWeight: strong ? 600 : 400 }}>{k}</span>
+      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: ".85rem", color: tint || (strong ? "#fff" : "rgba(255,255,255,.75)"), fontWeight: strong ? 700 : 400 }}>{v}</span>
+    </div>
+  )
+  const pct = (v, set, lbl) => (
+    <div>
+      <label style={label}>{lbl}</label>
+      <input style={input} type="number" value={v} onChange={e => set(e.target.value)} />
+    </div>
+  )
+
+  return (
+    <div>
+      <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1rem", fontWeight: 700, margin: "0 0 .3rem" }}>Price Builder — the government cost build-up</h3>
+      <p style={{ fontSize: ".85rem", color: "rgba(255,255,255,.5)", margin: "0 0 1.25rem", lineHeight: 1.6 }}>
+        Evaluators don't just look at your number — they check that it's <em>built</em>. Enter your real labor, then your
+        indirect rates, and this produces the same stack a contracting officer expects to see.
+      </p>
+
+      <div style={{ marginBottom: "1.25rem" }}>
+        <label style={label}>Labor</label>
+        {rows.map((r, i) => (
+          <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 110px 110px auto", gap: ".5rem", marginBottom: ".5rem" }}>
+            <input style={input} placeholder="Labor category (e.g. Site Supervisor)" value={r.title} onChange={e => setRow(i, "title", e.target.value)} />
+            <input style={input} type="number" placeholder="$/hr" value={r.rate} onChange={e => setRow(i, "rate", e.target.value)} />
+            <input style={input} type="number" placeholder="hours" value={r.hours} onChange={e => setRow(i, "hours", e.target.value)} />
+            <button onClick={() => delRow(i)} title="Remove"
+              style={{ background: "none", border: "1px solid rgba(255,255,255,.12)", color: "rgba(255,255,255,.4)", borderRadius: 6, cursor: "pointer", padding: "0 .7rem" }}>×</button>
+          </div>
+        ))}
+        <button onClick={addRow} style={{ ...btn, background: "none", border: "1px dashed rgba(255,255,255,.2)", color: "rgba(255,255,255,.5)" }}>+ Add labor category</button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: ".6rem", marginBottom: "1.25rem" }}>
+        {pct(fringe, setFringe, "Fringe %")}
+        {pct(overhead, setOverhead, "Overhead %")}
+        {pct(ga, setGa, "G&A %")}
+        {pct(fee, setFee, "Fee %")}
+        <div>
+          <label style={label}>Other costs $</label>
+          <input style={input} type="number" value={odc} onChange={e => setOdc(e.target.value)} />
+        </div>
+      </div>
+
+      <div style={{ background: "rgba(0,0,0,.25)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 10, padding: "1.1rem 1.25rem" }}>
+        <Line k="Direct labor" v={money(directLabor)} />
+        <Line k={`Fringe (${n(fringe)}%)`} v={money(fringeAmt)} />
+        <Line k={`Overhead (${n(overhead)}%)`} v={money(ohAmt)} />
+        {n(odc) > 0 && <Line k="Other direct costs" v={money(n(odc))} />}
+        <Line k={`G&A (${n(ga)}%)`} v={money(gaAmt)} />
+        <Line k="Total cost" v={money(totalCost)} strong />
+        <Line k={`Fee / profit (${n(fee)}%)`} v={money(feeAmt)} tint="#1DB954" />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", paddingTop: ".9rem" }}>
+          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>Total price</span>
+          <span style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.6rem", fontWeight: 900, color: "#F8C81C" }}>{money(totalPrice)}</span>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".75rem", marginTop: ".9rem" }}>
+        <div style={{ background: "rgba(31,182,238,.08)", border: "1px solid rgba(31,182,238,.25)", borderRadius: 8, padding: ".8rem 1rem" }}>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".55rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#1FB6EE" }}>Fully burdened rate</div>
+          <div style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.2rem", fontWeight: 900, marginTop: ".2rem" }}>${burdened.toFixed(2)}<span style={{ fontSize: ".75rem", color: "rgba(255,255,255,.45)" }}>/hr</span></div>
+        </div>
+        <div style={{ background: "rgba(248,200,28,.08)", border: "1px solid rgba(248,200,28,.25)", borderRadius: 8, padding: ".8rem 1rem" }}>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".55rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#F8C81C" }}>Wrap multiplier</div>
+          <div style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.2rem", fontWeight: 900, marginTop: ".2rem" }}>{multiplier.toFixed(2)}×</div>
+        </div>
+      </div>
+      <p style={{ fontSize: ".76rem", color: "rgba(255,255,255,.38)", marginTop: ".8rem", lineHeight: 1.6 }}>
+        A wrap multiplier of roughly 1.8×–2.4× is common for services work. Far below that and you may be underbidding your
+        true cost; far above and you'll likely be priced out. Check this against the price-to-win band in Bid IQ.
+      </p>
+    </div>
+  )
+}
+
+/* ── BID / NO-BID SCORECARD ──────────────────────────────────────
+   The cheapest way to win more is to stop spending weeks on bids you
+   were never going to win. Knockouts are absolute; the rest is weighted. */
+const GONOGO = [
+  { id: "elig",     q: "Do you meet every mandatory eligibility requirement (set-aside, certifications, licenses)?", knockout: true },
+  { id: "sam",      q: "Is your SAM.gov registration active right now?", knockout: true },
+  { id: "deadline", q: "Is there enough time left to submit a quality proposal?", knockout: true },
+  { id: "scope",    q: "Do you clearly understand what they're actually asking for?", weight: 3 },
+  { id: "capacity", q: "Can you actually deliver this — staff, equipment, capital?", weight: 3 },
+  { id: "relevant", q: "Do you have relevant experience (commercial counts)?", weight: 2 },
+  { id: "size",     q: "Is the contract the right size for your business today?", weight: 2 },
+  { id: "price",    q: "Can you price this competitively and still profit?", weight: 3 },
+  { id: "incumbent",q: "Is this new work (not an incumbent's easy recompete)?", weight: 2 },
+  { id: "relation", q: "Have you had any contact with the agency or attended the pre-bid?", weight: 1 },
+]
+
+function GoNoGo({ btn }) {
+  const [ans, setAns] = useState({})
+  const set = (id, v) => setAns(a => ({ ...a, [id]: v }))
+
+  const answered = GONOGO.filter(q => ans[q.id] !== undefined)
+  const knockFail = GONOGO.filter(q => q.knockout && ans[q.id] === "no")
+  const scored = GONOGO.filter(q => !q.knockout)
+  const max = scored.reduce((s, q) => s + q.weight * 2, 0)
+  const got = scored.reduce((s, q) => s + (ans[q.id] === "yes" ? q.weight * 2 : ans[q.id] === "partial" ? q.weight : 0), 0)
+  const pct = max ? Math.round((got / max) * 100) : 0
+  const done = answered.length === GONOGO.length
+
+  const verdict = knockFail.length
+    ? { label: "NO-BID", color: "#FF6432", why: `Blocked: ${knockFail.map(q => q.q.split("(")[0].trim().replace(/\?$/, "")).join("; ")}. These are pass/fail — fix them before spending another hour.` }
+    : pct >= 70 ? { label: "BID IT", color: "#1DB954", why: "Strong fit. You clear the mandatories and score well on capability, price, and understanding — this is worth your time." }
+    : pct >= 45 ? { label: "PROCEED WITH CARE", color: "#F8C81C", why: "Winnable, but you have real gaps. Shore up the weak answers below (or team with a partner) before you commit." }
+    : { label: "PROBABLY NO-BID", color: "#FF6432", why: "Low fit. Your time is better spent on a bid you can actually win — use Bid Radar to find a closer match." }
+
+  return (
+    <div>
+      <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1rem", fontWeight: 700, margin: "0 0 .3rem" }}>Bid / No-Bid Scorecard</h3>
+      <p style={{ fontSize: ".85rem", color: "rgba(255,255,255,.5)", margin: "0 0 1.25rem", lineHeight: 1.6 }}>
+        The fastest way to raise your win rate is to stop writing proposals you were never going to win.
+        Answer honestly — the first three are pass/fail.
+      </p>
+
+      {GONOGO.map(q => (
+        <div key={q.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", padding: ".7rem 0", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+          <span style={{ fontSize: ".88rem", color: "rgba(255,255,255,.82)" }}>
+            {q.q}
+            {q.knockout && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: ".52rem", letterSpacing: ".1em", color: "#FF6432", border: "1px solid rgba(255,100,50,.35)", borderRadius: 20, padding: ".1rem .45rem", marginLeft: ".5rem", verticalAlign: "middle" }}>PASS/FAIL</span>}
+          </span>
+          <div style={{ display: "flex", gap: ".35rem", flex: "none" }}>
+            {["yes", "partial", "no"].map(v => {
+              const on = ans[q.id] === v
+              const tint = v === "yes" ? "#1DB954" : v === "partial" ? "#F8C81C" : "#FF6432"
+              if (q.knockout && v === "partial") return null
+              return (
+                <button key={v} onClick={() => set(q.id, v)}
+                  style={{ background: on ? `${tint}22` : "none", border: `1px solid ${on ? tint : "rgba(255,255,255,.14)"}`, color: on ? tint : "rgba(255,255,255,.45)", padding: ".28rem .7rem", borderRadius: 20, fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer" }}>
+                  {v}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      {answered.length > 0 && (
+        <div style={{ marginTop: "1.5rem", background: `${verdict.color}12`, border: `1px solid ${verdict.color}55`, borderRadius: 10, padding: "1.25rem" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "1rem", flexWrap: "wrap" }}>
+            <span style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.35rem", fontWeight: 900, color: verdict.color }}>{verdict.label}</span>
+            {!knockFail.length && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: ".8rem", color: "rgba(255,255,255,.6)" }}>fit score {pct}%</span>}
+            {!done && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: ".6rem", color: "rgba(255,255,255,.35)" }}>({answered.length}/{GONOGO.length} answered)</span>}
+          </div>
+          <p style={{ fontSize: ".87rem", color: "rgba(255,255,255,.75)", marginTop: ".6rem", lineHeight: 1.6 }}>{verdict.why}</p>
+        </div>
+      )}
+    </div>
+  )
 }
