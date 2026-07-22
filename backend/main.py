@@ -14,12 +14,15 @@ import asyncio
 from datetime import datetime
 from typing import Optional, List
 
-# Load a local .env if present (dev). In prod, the platform sets env vars.
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except Exception:
-    pass
+# Load a local .env in DEV ONLY. On a hosting platform (Render sets RENDER=true)
+# the platform's own env vars are authoritative — a stray .env / Secret File must
+# never shadow them, or the dashboard value silently does nothing.
+if not os.environ.get("RENDER"):
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception:
+        pass
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
@@ -187,6 +190,19 @@ async def _debug_anthropic_key():
     """TEMPORARY diagnostic — reports the key FINGERPRINT only (never the key).
     Remove after verifying prod config."""
     k = os.environ.get("ANTHROPIC_API_KEY", "")
+    # Where could a competing value be coming from?
+    candidates = [".env", os.path.join(os.getcwd(), ".env"), "/etc/secrets/.env",
+                  "/etc/secrets/ANTHROPIC_API_KEY"]
+    found = {}
+    for p in candidates:
+        try:
+            if os.path.exists(p):
+                txt = open(p, "r", errors="replace").read()
+                hit = [l.split("=", 1)[1][:8] for l in txt.splitlines()
+                       if l.strip().startswith("ANTHROPIC_API_KEY=")]
+                found[p] = {"exists": True, "anthropic_line_prefix": hit[0] if hit else None}
+        except Exception as e:
+            found[p] = {"exists": True, "error": str(e)[:80]}
     return {
         "present": bool(k),
         "length": len(k),
@@ -195,6 +211,9 @@ async def _debug_anthropic_key():
         "has_leading_or_trailing_space": k != k.strip(),
         "has_quotes": k.startswith(('"', "'")) or k.endswith(('"', "'")),
         "model": os.environ.get("ANTHROPIC_MODEL", "(default)"),
+        "on_render": bool(os.environ.get("RENDER")),
+        "cwd": os.getcwd(),
+        "dotenv_files_found": found or "none",
     }
 
 
