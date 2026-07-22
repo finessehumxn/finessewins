@@ -24,6 +24,33 @@ if not os.environ.get("RENDER"):
     except Exception:
         pass
 
+def _hydrate_env_from_secret_files(secrets_dir: str = "/etc/secrets") -> None:
+    """Render 'Secret Files' are files on disk, not environment variables — so a
+    key put there is silently invisible to the app. Surface any ENV-VAR-shaped
+    secret file as an env var (a real env var always wins) so a key works from
+    EITHER place. This is the difference between 'saved it' and 'it took effect'."""
+    import re as _re
+    try:
+        if not os.path.isdir(secrets_dir):
+            return
+        for name in os.listdir(secrets_dir):
+            if not _re.fullmatch(r"[A-Z][A-Z0-9_]{2,}", name):
+                continue                       # only ENV_VAR-looking filenames
+            if (os.environ.get(name) or "").strip():
+                continue                       # an explicitly-set env var wins
+            try:
+                val = open(os.path.join(secrets_dir, name), "r", errors="replace").read().strip()
+                if val:
+                    os.environ[name] = val
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+_hydrate_env_from_secret_files()
+
+
 def _resolve_anthropic_key() -> str:
     """Accept the Anthropic key from either a normal env var OR a Render
     'Secret File' (/etc/secrets/ANTHROPIC_API_KEY) — people reasonably put it in
