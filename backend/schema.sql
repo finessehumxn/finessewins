@@ -140,6 +140,23 @@ create trigger org_clients_touch
     for each row execute function public.touch_updated_at();
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- saved searches — named, re-runnable bid searches (Find Bids retention loop)
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists public.saved_searches (
+    id           uuid primary key default gen_random_uuid(),
+    user_id      uuid not null references auth.users(id) on delete cascade,
+    name         text not null,
+    keywords     text,
+    naics_code   text,
+    set_aside    text,
+    state        text,
+    created_at   timestamptz not null default now(),
+    last_run_at  timestamptz
+);
+
+create index if not exists saved_searches_user_idx on public.saved_searches (user_id, created_at desc);
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- keep updated_at fresh
 -- ─────────────────────────────────────────────────────────────────────────────
 create or replace function public.touch_updated_at()
@@ -162,6 +179,11 @@ alter table public.proposals             enable row level security;
 alter table public.tracked_solicitations enable row level security;
 alter table public.opportunity_matches   enable row level security;
 alter table public.org_clients            enable row level security;
+alter table public.saved_searches         enable row level security;
+
+drop policy if exists "own searches" on public.saved_searches;
+create policy "own searches" on public.saved_searches
+    for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 drop policy if exists "own matches" on public.opportunity_matches;
 create policy "own matches" on public.opportunity_matches

@@ -24,6 +24,31 @@ if not os.environ.get("RENDER"):
     except Exception:
         pass
 
+def _resolve_anthropic_key() -> str:
+    """Accept the Anthropic key from either a normal env var OR a Render
+    'Secret File' (/etc/secrets/ANTHROPIC_API_KEY) — people reasonably put it in
+    either place. A real Anthropic key always starts with 'sk-ant-'; if the env
+    var holds something else (e.g. a Groq 'gsk_' key), prefer a valid secret file."""
+    env_key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    if env_key.startswith("sk-ant-"):
+        return env_key
+    for p in ("/etc/secrets/ANTHROPIC_API_KEY", "/etc/secrets/anthropic_api_key",
+              "/etc/secrets/ANTHROPIC_KEY"):
+        try:
+            if os.path.exists(p):
+                val = open(p, "r", errors="replace").read().strip()
+                # tolerate a KEY=VALUE line as well as a bare value
+                if "=" in val.splitlines()[0] and val.upper().startswith("ANTHROPIC"):
+                    val = val.splitlines()[0].split("=", 1)[1].strip()
+                if val.startswith("sk-ant-"):
+                    return val
+        except Exception:
+            pass
+    return env_key
+
+
+os.environ["ANTHROPIC_API_KEY"] = _resolve_anthropic_key()
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -52,6 +77,7 @@ from auth import require_user, optional_user, User, auth_enabled
 from db import (
     proposals as store, profiles as profile_store, tracked as tracked_store,
     matches as match_store, clients as client_store, supabase_enabled,
+    saved_searches as search_store,
 )
 
 app = FastAPI(title="FinesseWins", version="1.1.0")
@@ -197,10 +223,8 @@ async def _debug_anthropic_key():
     for p in candidates:
         try:
             if os.path.exists(p):
-                txt = open(p, "r", errors="replace").read()
-                hit = [l.split("=", 1)[1][:8] for l in txt.splitlines()
-                       if l.strip().startswith("ANTHROPIC_API_KEY=")]
-                found[p] = {"exists": True, "anthropic_line_prefix": hit[0] if hit else None}
+                txt = open(p, "r", errors="replace").read().strip()
+                found[p] = {"exists": True, "content_prefix": txt[:14], "content_len": len(txt)}
         except Exception as e:
             found[p] = {"exists": True, "error": str(e)[:80]}
     return {
@@ -521,6 +545,40 @@ async def rfp_export_matrix(req: MatrixExport, user=Depends(optional_user)):
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="{name}_Compliance_Matrix.docx"'},
     )
+
+# ── SAVED SEARCHES (Find Bids retention loop) ────────────────────
+
+class SavedSearchIn(BaseModel):
+    name: str
+    keywords: Optional[str] = None
+    naics_code: Optional[str] = None
+    set_aside: Optional[str] = None
+    state: Optional[str] = None
+
+
+@app.get("/api/searches")
+async def list_saved_searches(user: User = Depends(require_user)):
+    return {"searches": await search_store.list(user.id)}
+
+
+@app.post("/api/searches")
+async def save_search(req: SavedSearchIn, user: User = Depends(require_user)):
+    if not any([req.keywords, req.naics_code, req.set_aside, req.state]):
+        raise HTTPException(400, "Add at least one filter before saving a search.")
+    return {"search": await search_store.create(user.id, req.dict()), "saved": True}
+
+
+@app.post("/api/searches/{search_id}/run")
+async def mark_search_run(search_id: str, user: User = Depends(require_user)):
+    await search_store.touch(user.id, search_id)
+    return {"ok": True}
+
+
+@app.delete("/api/searches/{search_id}")
+async def delete_saved_search(search_id: str, user: User = Depends(require_user)):
+    await search_store.delete(user.id, search_id)
+    return {"deleted": True}
+
 
 # ── COMPANY PROFILE ──────────────────────────────────────────────
 

@@ -486,9 +486,81 @@ class ClientStore:
                     self._mem.pop(client_id, None)
 
 
+class SavedSearchStore:
+    """Named, re-runnable bid searches — the retention loop for Find Bids.
+
+    A first-timer figures out the one search that surfaces their work
+    ("janitorial + WOSB + Arizona") exactly once, then re-runs it forever.
+    """
+
+    def __init__(self):
+        self._mem: dict = {}          # search_id -> row
+        self._lock = asyncio.Lock()
+
+    async def list(self, user_id: str) -> List[dict]:
+        if supabase_enabled():
+            def _q():
+                return (
+                    get_client().table("saved_searches").select("*")
+                    .eq("user_id", user_id).order("created_at", desc=True)
+                    .execute().data or []
+                )
+            return await asyncio.to_thread(_q)
+        rows = [r for r in self._mem.values() if r.get("user_id") == user_id]
+        return sorted(rows, key=lambda r: r.get("created_at", ""), reverse=True)
+
+    async def create(self, user_id: str, data: dict) -> dict:
+        row = {
+            "user_id": user_id,
+            "name": (data.get("name") or "").strip() or "Untitled search",
+            "keywords": data.get("keywords") or None,
+            "naics_code": data.get("naics_code") or None,
+            "set_aside": data.get("set_aside") or None,
+            "state": data.get("state") or None,
+        }
+        if supabase_enabled():
+            def _q():
+                return get_client().table("saved_searches").insert(_clean(row)).execute().data
+            out = await asyncio.to_thread(_q)
+            return (out or [row])[0]
+        row["id"] = str(uuid.uuid4())
+        row["created_at"] = datetime.utcnow().isoformat()
+        row["last_run_at"] = None
+        async with self._lock:
+            self._mem[row["id"]] = row
+        return row
+
+    async def touch(self, user_id: str, search_id: str):
+        """Record that a saved search was re-run."""
+        stamp = datetime.utcnow().isoformat()
+        if supabase_enabled():
+            def _q():
+                (get_client().table("saved_searches").update({"last_run_at": stamp})
+                 .eq("id", search_id).eq("user_id", user_id).execute())
+            await asyncio.to_thread(_q)
+        else:
+            async with self._lock:
+                row = self._mem.get(search_id)
+                if row and row.get("user_id") == user_id:
+                    row["last_run_at"] = stamp
+
+    async def delete(self, user_id: str, search_id: str):
+        if supabase_enabled():
+            def _q():
+                (get_client().table("saved_searches").delete()
+                 .eq("id", search_id).eq("user_id", user_id).execute())
+            await asyncio.to_thread(_q)
+        else:
+            async with self._lock:
+                row = self._mem.get(search_id)
+                if row and row.get("user_id") == user_id:
+                    self._mem.pop(search_id, None)
+
+
 # Shared singletons
 proposals = ProposalStore()
 profiles = ProfileStore()
 tracked = TrackedStore()
 matches = MatchStore()
 clients = ClientStore()
+saved_searches = SavedSearchStore()
