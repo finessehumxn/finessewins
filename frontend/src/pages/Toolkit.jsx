@@ -7,6 +7,7 @@ const TABS = [
   { id: "rfp", label: "RFP Explainer", icon: "📖" },
   { id: "price", label: "Price Builder", icon: "🧮" },
   { id: "gonogo", label: "Bid / No-Bid", icon: "⚖️" },
+  { id: "debrief", label: "Debrief Request", icon: "📬" },
   { id: "cert", label: "Certification Check", icon: "✅" },
 ]
 
@@ -53,6 +54,7 @@ export default function Toolkit({ onNavigate }) {
           {tab === "rfp" && <RfpTool profile={profile} label={label} input={input} btn={btn} />}
           {tab === "price" && <PriceBuilder label={label} input={input} btn={btn} />}
           {tab === "gonogo" && <GoNoGo btn={btn} />}
+          {tab === "debrief" && <DebriefTool profile={profile} label={label} input={input} btn={btn} />}
           {tab === "cert" && <CertTool profile={profile} onNavigate={onNavigate} btn={btn} />}
         </div>
       )}
@@ -411,6 +413,113 @@ function GoNoGo({ btn }) {
           <p style={{ fontSize: ".87rem", color: "rgba(255,255,255,.75)", marginTop: ".6rem", lineHeight: 1.6 }}>{verdict.why}</p>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ── DEBRIEF REQUEST ──────────────────────────────────────────────
+   When you lose a federal bid you have the RIGHT to be told why — but
+   for negotiated procurements you must ask within 3 days of notice
+   (FAR 15.506). First-timers almost never ask, so they lose the same
+   way twice. This writes the letter and starts the clock. */
+function DebriefTool({ profile, label, input, btn }) {
+  const [f, setF] = useState({
+    solicitation: "", title: "", agency: "", co_name: "", co_email: "",
+    notified: "", level: "federal",
+  })
+  const [copied, setCopied] = useState(false)
+  const up = (k, v) => setF(s => ({ ...s, [k]: v }))
+
+  const company = profile?.name || "[Your Company Name]"
+  const signer = profile?.email ? `${company}\n${profile.email}` : company
+
+  const daysLeft = (() => {
+    if (!f.notified) return null
+    const d = Math.ceil((new Date(f.notified).getTime() + 3 * 86400000 - Date.now()) / 86400000)
+    return isNaN(d) ? null : d
+  })()
+
+  const federal = f.level === "federal"
+  const letter = `${f.co_name || "[Contracting Officer]"}
+${f.agency || "[Agency]"}
+${f.co_email || ""}
+
+RE: Request for Debriefing — Solicitation ${f.solicitation || "[Number]"}${f.title ? ` (${f.title})` : ""}
+
+Dear ${f.co_name || "Contracting Officer"}:
+
+${company} received notification on ${f.notified || "[date]"} that our proposal for the above-referenced solicitation was not selected for award. Thank you for the opportunity to compete.
+
+Pursuant to ${federal ? "FAR 15.506, we hereby request a post-award debriefing" : "your agency's procurement regulations, we respectfully request a debriefing"}. This request is submitted in writing within the required timeframe.
+
+We respectfully request that the debriefing address:
+
+1. The Government's evaluation of the significant weaknesses or deficiencies in our proposal.
+2. The overall evaluated cost or price and technical rating of our proposal${federal ? " and of the awardee's proposal" : ""}.
+3. The overall ranking of all offerors, if a ranking was developed.
+4. A summary of the rationale for award.
+5. Reasonable responses to relevant questions about whether source-selection procedures set forth in the solicitation, applicable regulations, and other applicable authorities were followed.
+
+We are available at your convenience and can accommodate a written, telephonic, or in-person debriefing, whichever is most efficient for your office.
+
+${company} is a small business${Array.isArray(profile?.certifications) && profile.certifications.length ? ` (${profile.certifications.join(", ")})` : ""} committed to serving ${f.agency || "your agency"}. We intend to use this feedback to submit a stronger proposal on future requirements.
+
+Thank you for your time and consideration.
+
+Sincerely,
+
+${signer}`
+
+  const copy = () => { navigator.clipboard?.writeText(letter); setCopied(true); setTimeout(() => setCopied(false), 1600) }
+
+  return (
+    <div>
+      <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1rem", fontWeight: 700, margin: "0 0 .3rem" }}>Debrief Request</h3>
+      <p style={{ fontSize: ".85rem", color: "rgba(255,255,255,.5)", margin: "0 0 1rem", lineHeight: 1.6 }}>
+        Lost a bid? You're entitled to know why — and that feedback is the single fastest way to win the next one.
+        Most first-time bidders never ask.
+      </p>
+
+      <div style={{ background: "rgba(255,100,50,.08)", border: "1px solid rgba(255,100,50,.3)", borderRadius: 8, padding: ".8rem 1rem", marginBottom: "1.25rem" }}>
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#FF8870", marginBottom: ".3rem" }}>⏱ Time limit</div>
+        <div style={{ fontSize: ".85rem", color: "rgba(255,255,255,.8)", lineHeight: 1.6 }}>
+          For federal negotiated procurements you must request a debriefing <strong style={{ color: "#fff" }}>in writing within 3 days</strong> of
+          receiving notice of award (FAR 15.506). Miss it and the agency isn't required to give you one.
+          {daysLeft !== null && (
+            <div style={{ marginTop: ".5rem", fontFamily: "'DM Mono', monospace", fontSize: ".8rem", color: daysLeft >= 0 ? "#F8C81C" : "#FF6432" }}>
+              {daysLeft > 0 ? `≈ ${daysLeft} day${daysLeft === 1 ? "" : "s"} left to request` : daysLeft === 0 ? "Today is the last day — send it now" : "The 3-day window has passed — you can still ask; the agency may grant it at its discretion."}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".7rem", marginBottom: "1rem" }}>
+        <div><label style={label}>Solicitation number</label><input style={input} value={f.solicitation} onChange={e => up("solicitation", e.target.value)} placeholder="e.g. BPM007574" /></div>
+        <div><label style={label}>Solicitation title</label><input style={input} value={f.title} onChange={e => up("title", e.target.value)} placeholder="e.g. Child Specific Recruitment" /></div>
+        <div><label style={label}>Agency</label><input style={input} value={f.agency} onChange={e => up("agency", e.target.value)} placeholder="e.g. AZ Dept of Child Safety" /></div>
+        <div><label style={label}>Contracting officer</label><input style={input} value={f.co_name} onChange={e => up("co_name", e.target.value)} placeholder="Name on the award notice" /></div>
+        <div><label style={label}>CO email</label><input style={input} value={f.co_email} onChange={e => up("co_email", e.target.value)} placeholder="optional" /></div>
+        <div><label style={label}>Date you were notified</label><input style={input} type="date" value={f.notified} onChange={e => up("notified", e.target.value)} /></div>
+        <div style={{ gridColumn: "span 2" }}>
+          <label style={label}>Procurement level</label>
+          <div style={{ display: "flex", gap: ".5rem" }}>
+            {[["federal", "Federal (FAR)"], ["state", "State / local"]].map(([v, l]) => (
+              <button key={v} onClick={() => up("level", v)}
+                style={{ background: f.level === v ? "rgba(236,28,123,.15)" : "none", border: `1px solid ${f.level === v ? "#EC1C7B" : "rgba(255,255,255,.15)"}`, color: f.level === v ? "#fff" : "rgba(255,255,255,.5)", padding: ".45rem 1rem", borderRadius: 20, fontFamily: "'DM Mono', monospace", fontSize: ".62rem", letterSpacing: ".06em", cursor: "pointer" }}>{l}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: ".7rem", marginBottom: ".9rem" }}>
+        <button onClick={copy} style={btn()}>{copied ? "✓ Copied" : "Copy letter"}</button>
+      </div>
+      <textarea readOnly value={letter}
+        style={{ width: "100%", minHeight: 420, background: "rgba(0,0,0,.25)", border: "1px solid rgba(255,255,255,.12)", color: "rgba(255,255,255,.9)", padding: "1.1rem", fontFamily: "'Space Grotesk', sans-serif", fontSize: ".86rem", lineHeight: 1.65, borderRadius: 10, outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+      <p style={{ fontSize: ".76rem", color: "rgba(255,255,255,.38)", marginTop: ".7rem", lineHeight: 1.6 }}>
+        Send it to the contracting officer named on your award notice, by email, and keep the sent copy. Then record the
+        loss in your pipeline — your debrief notes are what turn a loss into the next win.
+      </p>
     </div>
   )
 }
