@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react"
 import { apiJson } from "../lib/api"
-import GettingStarted from "../components/GettingStarted"
 
 const STATUS_CONFIG = {
   submitted: { label: "Submitted", color: "#1DB954", bg: "rgba(29,185,84,.1)" },
@@ -52,6 +51,7 @@ export default function Dashboard({ onNavigate }) {
   const [proposals, setProposals] = useState([])
   const [profile, setProfile] = useState(null)
   const [analytics, setAnalytics] = useState(null)
+  const [moves, setMoves] = useState(null)
   const [savingOutcome, setSavingOutcome] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -60,10 +60,12 @@ export default function Dashboard({ onNavigate }) {
     apiJson("/api/proposals").catch(() => ({ proposals: [] })),
     apiJson("/api/profile").catch(() => null),
     apiJson("/api/analytics/winloss").catch(() => null),
-  ]).then(([list, prof, stats]) => {
+    apiJson("/api/me/next-moves").catch(() => null),
+  ]).then(([list, prof, stats, mv]) => {
     setProposals(Array.isArray(list?.proposals) ? list.proposals.map(toRow) : [])
     setProfile(prof || null)
     setAnalytics(stats || null)
+    setMoves(mv || null)
   })
 
   useEffect(() => {
@@ -112,16 +114,19 @@ export default function Dashboard({ onNavigate }) {
           {companyLabel}
         </div>
         <h1 style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.8rem", fontWeight: 900, margin: 0, letterSpacing: "-.02em" }}>
-          Bid Pipeline
+          {moves?.headline || "Bid Pipeline"}
         </h1>
+        {moves?.subhead && (
+          <p style={{ color: "rgba(255,255,255,.55)", fontSize: ".92rem", marginTop: ".5rem", maxWidth: 640 }}>{moves.subhead}</p>
+        )}
       </div>
 
       {error && (
         <div style={{ background: "rgba(255,100,80,.1)", border: "1px solid rgba(255,100,80,.3)", borderRadius: 8, padding: ".8rem 1rem", marginBottom: "1rem", fontSize: ".85rem", color: "#FF8870" }}>{error}</div>
       )}
 
-      {/* First-run onboarding checklist (hides itself once complete/dismissed) */}
-      <GettingStarted onNavigate={onNavigate} />
+      {/* What THIS business should do next — the personalization layer */}
+      <NextMoves moves={moves} onNavigate={onNavigate} />
 
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem", marginBottom: "2rem" }}>
@@ -351,6 +356,75 @@ export default function Dashboard({ onNavigate }) {
             })
           })()}
         </div>
+      </div>
+    </div>
+  )
+}
+
+
+/* ── YOUR NEXT MOVES ──────────────────────────────────────────────
+   The difference between a toolbox and a product. Instead of eleven
+   tools the user must know how to choose between, this is the short,
+   ranked list of what THIS business should do next — each with the
+   number that makes it real and one click to go do it. */
+const IMPACT = {
+  high:   { tint: "#EC1C7B", label: "Do this first" },
+  medium: { tint: "#1FB6EE", label: "Worth doing" },
+  low:    { tint: "rgba(255,255,255,.35)", label: "" },
+}
+
+function NextMoves({ moves, onNavigate }) {
+  if (!moves || !moves.moves?.length) return null
+  const list = moves.moves
+  return (
+    <div style={{ marginBottom: "2rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: ".7rem", marginBottom: ".9rem", flexWrap: "wrap" }}>
+        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: ".6rem", letterSpacing: ".16em", textTransform: "uppercase", color: "rgba(255,255,255,.45)" }}>
+          Your next moves
+        </span>
+        {moves.blockers > 0 && (
+          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: ".54rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#FF6432", border: "1px solid rgba(255,100,50,.4)", borderRadius: 20, padding: ".12rem .5rem" }}>
+            {moves.blockers} blocking {moves.blockers === 1 ? "item" : "items"}
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: "grid", gap: ".6rem" }}>
+        {list.map((m, i) => {
+          const tone = IMPACT[m.impact] || IMPACT.low
+          return (
+            <div key={m.id + i}
+              onClick={() => onNavigate(m.page)}
+              style={{
+                display: "flex", alignItems: "center", gap: "1rem",
+                background: m.blocker ? "rgba(255,100,50,.06)" : "rgba(255,255,255,.03)",
+                border: `1px solid ${m.blocker ? "rgba(255,100,50,.28)" : "rgba(255,255,255,.08)"}`,
+                borderLeft: `3px solid ${m.blocker ? "#FF6432" : tone.tint}`,
+                borderRadius: 10, padding: "1rem 1.15rem", cursor: "pointer", transition: "background .15s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.055)"}
+              onMouseLeave={e => e.currentTarget.style.background = m.blocker ? "rgba(255,100,50,.06)" : "rgba(255,255,255,.03)"}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: ".6rem", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: ".95rem", fontWeight: 600 }}>{m.title}</span>
+                  {m.stat && (
+                    <span style={{ fontFamily: "'Unbounded', sans-serif", fontSize: ".72rem", fontWeight: 900, color: "#F8C81C" }}>{m.stat}</span>
+                  )}
+                  {m.blocker && (
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: ".5rem", letterSpacing: ".1em", textTransform: "uppercase", color: "#FF6432", border: "1px solid rgba(255,100,50,.4)", borderRadius: 20, padding: ".1rem .45rem" }}>Blocking</span>
+                  )}
+                </div>
+                <div style={{ fontSize: ".84rem", color: "rgba(255,255,255,.6)", marginTop: ".25rem", lineHeight: 1.5 }}>{m.why}</div>
+              </div>
+              <span style={{
+                flex: "none", fontFamily: "'DM Mono', monospace", fontSize: ".6rem", letterSpacing: ".08em",
+                textTransform: "uppercase", color: m.blocker ? "#FF6432" : tone.tint,
+                border: `1px solid ${m.blocker ? "rgba(255,100,50,.4)" : tone.tint + "55"}`,
+                borderRadius: 6, padding: ".45rem .8rem", whiteSpace: "nowrap",
+              }}>{m.cta} →</span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

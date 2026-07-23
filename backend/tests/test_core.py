@@ -274,3 +274,36 @@ def test_rate_limiter_blocks_after_max():
 
 class _H(dict):
     def get(self, k, d=None): return dict.get(self, k, d)
+
+
+def test_coach_blocks_new_user_and_guides_established():
+    import coach
+    # brand-new user: blockers first, and they ARE marked as blockers
+    new = run(coach.next_moves({}, [], deep=False))
+    assert new["stage"] == "setup"
+    assert new["blockers"] >= 3
+    assert new["moves"][0]["blocker"] is True
+    ids = [m["id"] for m in new["moves"]]
+    assert "profile" in ids and "naics" in ids and "sam" in ids
+
+    # established user: no blockers, surfaces the imminent deadline first
+    prof = {"name": "Acme", "naics_codes": ["561720"], "uei": "U1",
+            "certifications": ["WOSB"], "past_performance": [{"title": "x"}]}
+    from datetime import datetime, timedelta
+    soon = (datetime.utcnow() + timedelta(days=3)).isoformat()
+    props = [{"status": "complete", "outcome": None, "deadline": soon, "title": "City janitorial"},
+             {"status": "complete", "outcome": None},
+             {"status": "complete", "outcome": "lost"}]
+    est = run(coach.next_moves(prof, props, deep=False))
+    assert est["blockers"] == 0
+    assert est["stage"] == "bidding"
+    assert est["moves"][0]["id"] == "deadline"
+    assert any(m["id"] == "outcomes" for m in est["moves"])
+    assert any(m["id"] == "debrief" for m in est["moves"])
+
+    # a winner gets the growth framing
+    won = run(coach.next_moves(prof, [{"status": "complete", "outcome": "won"}], deep=False))
+    assert won["stage"] == "growing"
+
+    # never overwhelm: capped
+    assert len(new["moves"]) <= 6 and len(est["moves"]) <= 6

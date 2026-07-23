@@ -98,6 +98,7 @@ import winnability as winnability_engine
 from naics_data import naics_name, suggestions as naics_suggestions, search as naics_search
 import docparse
 import rfp_shredder
+import coach
 
 from ratelimit import search_limit, intel_limit, generate_limit
 from auth import require_user, optional_user, User, auth_enabled
@@ -572,6 +573,18 @@ async def recompete_radar(
         "total_value": total,
         "recompetes": rows[:200],
     }
+
+
+@app.get("/api/me/next-moves")
+async def my_next_moves(user: User = Depends(require_user)):
+    """The personalized action list: what THIS business should do next."""
+    profile = await profile_store.get(user.id)
+    proposals = await store.list_all(user.id)
+    try:
+        return await coach.next_moves(profile, proposals)
+    except Exception:
+        # never let the dashboard's most important panel take the page down
+        return await coach.next_moves(profile, proposals, deep=False)
 
 
 @app.get("/api/intel/primes")
