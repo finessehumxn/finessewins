@@ -7,6 +7,7 @@ const TABS = [
   { id: "rfp", label: "RFP Explainer", icon: "📖" },
   { id: "price", label: "Price Builder", icon: "🧮" },
   { id: "gonogo", label: "Bid / No-Bid", icon: "⚖️" },
+  { id: "pastperf", label: "Past Performance", icon: "🏅" },
   { id: "debrief", label: "Debrief Request", icon: "📬" },
   { id: "cert", label: "Certification Check", icon: "✅" },
 ]
@@ -31,8 +32,9 @@ export default function Toolkit({ onNavigate }) {
         <h1 style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.8rem", fontWeight: 900, margin: 0, letterSpacing: "-.02em" }}>Quick tools</h1>
         <p style={{ color: "rgba(255,255,255,.6)", fontSize: ".9rem", marginTop: ".6rem", maxWidth: 620 }}>
           The essentials every first-time bidder needs — a polished capability statement, a plain-English read on any RFP,
-          a real government cost build-up so you price to win, an honest bid/no-bid call before you burn a week, and a
-          check of which certifications you qualify for.
+          a real government cost build-up so you price to win, an honest bid/no-bid call before you burn a week,
+          past-performance entries built the way evaluators score them, the debrief letter that tells you why you lost,
+          and a check of which certifications you qualify for.
         </p>
       </div>
 
@@ -54,6 +56,7 @@ export default function Toolkit({ onNavigate }) {
           {tab === "rfp" && <RfpTool profile={profile} label={label} input={input} btn={btn} />}
           {tab === "price" && <PriceBuilder label={label} input={input} btn={btn} />}
           {tab === "gonogo" && <GoNoGo btn={btn} />}
+          {tab === "pastperf" && <PastPerfTool profile={profile} label={label} input={input} btn={btn} />}
           {tab === "debrief" && <DebriefTool profile={profile} label={label} input={input} btn={btn} />}
           {tab === "cert" && <CertTool profile={profile} onNavigate={onNavigate} btn={btn} />}
         </div>
@@ -520,6 +523,158 @@ ${signer}`
         Send it to the contracting officer named on your award notice, by email, and keep the sent copy. Then record the
         loss in your pipeline — your debrief notes are what turn a loss into the next win.
       </p>
+    </div>
+  )
+}
+
+/* ── PAST PERFORMANCE BUILDER ─────────────────────────────────────
+   The "I have no government experience" wall. You almost always DO have
+   relevant work — commercial, nonprofit, subcontract, even substantial
+   volunteer delivery — you just haven't written it the way an evaluator
+   scores it: scope, scale, outcome with numbers, and a verifiable
+   reference. This builds that structure and saves it to the profile so
+   every generated proposal can draw on it. */
+const CLIENT_TYPES = [
+  ["commercial", "Commercial client"],
+  ["nonprofit", "Nonprofit / community"],
+  ["government", "Government (any level)"],
+  ["subcontract", "Subcontract under a prime"],
+]
+
+/* Defined at module scope on purpose: a component declared inside the render
+   body is a NEW component type every render, so React remounts the inputs and
+   the field loses focus after each keystroke. */
+function PPField({ k, lbl, ph, area, f, up, label, input }) {
+  return (
+    <div style={{ gridColumn: area ? "span 2" : undefined }}>
+      <label style={label}>{lbl}</label>
+      {area
+        ? <textarea style={{ ...input, minHeight: 84, resize: "vertical" }} value={f[k]} onChange={e => up(k, e.target.value)} placeholder={ph} />
+        : <input style={input} value={f[k]} onChange={e => up(k, e.target.value)} placeholder={ph} />}
+    </div>
+  )
+}
+
+function PastPerfTool({ profile, label, input, btn }) {
+  const [f, setF] = useState({
+    title: "", agency: "", client_type: "commercial", value: "", naics: "",
+    period: "", role: "", scope: "", outcome: "", ref_name: "", ref_contact: "",
+  })
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+  const [copied, setCopied] = useState(false)
+  const up = (k, v) => setF(s => ({ ...s, [k]: v }))
+
+  const existing = Array.isArray(profile?.past_performance) ? profile.past_performance : []
+
+  const narrative = `${f.title || "[Project title]"}
+Client: ${f.agency || "[Client / organization]"}${f.value ? `  |  Value: ${f.value}` : ""}${f.period ? `  |  Period: ${f.period}` : ""}${f.naics ? `  |  NAICS ${f.naics}` : ""}
+
+Scope. ${f.scope || "[What you were engaged to do — the actual work, stated concretely.]"}
+
+Our role. ${f.role || "[Your specific responsibility — prime, sub, sole provider, team lead — and who performed the work.]"}
+
+Results. ${f.outcome || "[What changed because you did it. Use numbers wherever you can: volume delivered, on-time rate, cost saved, people served, error rate, uptime, satisfaction score.]"}
+
+Relevance. This engagement demonstrates ${f.title ? "the same" : "[the]"} capability required by the solicitation${f.naics ? ` under NAICS ${f.naics}` : ""}: comparable scope, comparable scale, and documented delivery.
+
+Reference. ${f.ref_name || "[Name, title]"}${f.ref_contact ? ` — ${f.ref_contact}` : ""}`
+
+  const strength = (() => {
+    let pts = 0
+    if (f.title) pts++
+    if (f.agency) pts++
+    if (f.scope && f.scope.length > 60) pts++
+    if (f.outcome && /\d/.test(f.outcome)) pts += 2       // numbers are what score
+    if (f.value) pts++
+    if (f.period) pts++
+    if (f.ref_name && f.ref_contact) pts += 2             // verifiable reference
+    const max = 9
+    const pct = Math.round((pts / max) * 100)
+    return { pct, tone: pct >= 75 ? "#1DB954" : pct >= 45 ? "#F8C81C" : "#FF6432" }
+  })()
+
+  const save = async () => {
+    if (!f.title || !f.agency) { setError("A title and client are required."); return }
+    setSaving(true); setError(null)
+    try {
+      const entry = {
+        title: f.title, agency: f.agency, value: f.value || "Available upon request",
+        naics: f.naics || "", description: narrative,
+      }
+      await apiJson("/api/profile", {
+        method: "PUT",
+        body: JSON.stringify({ ...(profile || {}), past_performance: [...existing, entry] }),
+      })
+      setSaved(true); setTimeout(() => setSaved(false), 2200)
+    } catch (e) { setError(e.message) } finally { setSaving(false) }
+  }
+  const copy = () => { navigator.clipboard?.writeText(narrative); setCopied(true); setTimeout(() => setCopied(false), 1600) }
+
+  return (
+    <div>
+      <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1rem", fontWeight: 700, margin: "0 0 .3rem" }}>Past Performance Builder</h3>
+      <p style={{ fontSize: ".85rem", color: "rgba(255,255,255,.5)", margin: "0 0 1rem", lineHeight: 1.6 }}>
+        "No government experience" is almost never true — you have relevant work, it's just not written the way
+        evaluators score it. Build one properly structured entry here and it's saved to your profile for every proposal.
+      </p>
+
+      <div style={{ background: "rgba(31,182,238,.07)", border: "1px solid rgba(31,182,238,.25)", borderRadius: 8, padding: ".85rem 1rem", marginBottom: "1.25rem" }}>
+        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#1FB6EE", marginBottom: ".35rem" }}>What actually scores</div>
+        <div style={{ fontSize: ".84rem", color: "rgba(255,255,255,.78)", lineHeight: 1.65 }}>
+          Evaluators look for <strong style={{ color: "#fff" }}>comparable scope, comparable scale, measurable results, and a reference they can call.</strong> A
+          commercial contract with real numbers beats a government contract described in vague adjectives — every time.
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".7rem", marginBottom: "1rem" }}>
+        <PPField k="title" lbl="Project title" ph="e.g. Nightly janitorial — 3 medical clinics" f={f} up={up} label={label} input={input} />
+        <PPField k="agency" lbl="Client / organization" ph="Who you did it for" f={f} up={up} label={label} input={input} />
+        <div>
+          <label style={label}>Client type</label>
+          <div style={{ display: "flex", gap: ".35rem", flexWrap: "wrap" }}>
+            {CLIENT_TYPES.map(([v, l]) => (
+              <button key={v} onClick={() => up("client_type", v)}
+                style={{ background: f.client_type === v ? "rgba(236,28,123,.15)" : "none", border: `1px solid ${f.client_type === v ? "#EC1C7B" : "rgba(255,255,255,.15)"}`, color: f.client_type === v ? "#fff" : "rgba(255,255,255,.5)", padding: ".35rem .7rem", borderRadius: 20, fontFamily: "'DM Mono', monospace", fontSize: ".56rem", letterSpacing: ".04em", cursor: "pointer" }}>{l}</button>
+            ))}
+          </div>
+        </div>
+        <PPField k="value" lbl="Contract value" ph="$85,000 (or 'Available upon request')" f={f} up={up} label={label} input={input} />
+        <PPField k="period" lbl="Period of performance" ph="Mar 2024 – Feb 2026" f={f} up={up} label={label} input={input} />
+        <PPField k="naics" lbl="NAICS (optional)" ph="561720" f={f} up={up} label={label} input={input} />
+        <PPField k="scope" lbl="Scope — what you were engaged to do" ph="Be concrete: what, where, how often, how much." area f={f} up={up} label={label} input={input} />
+        <PPField k="role" lbl="Your role" ph="Prime / sub / sole provider; who performed the work." area f={f} up={up} label={label} input={input} />
+        <PPField k="outcome" lbl="Results — use numbers" ph="e.g. 100% on-time over 24 months; zero deficiencies on 8 inspections; reduced supply cost 18%." area f={f} up={up} label={label} input={input} />
+        <PPField k="ref_name" lbl="Reference name & title" ph="Jane Ruiz, Facilities Director" f={f} up={up} label={label} input={input} />
+        <PPField k="ref_contact" lbl="Reference phone / email" ph="They may actually be called" f={f} up={up} label={label} input={input} />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.45)", marginBottom: ".35rem" }}>
+            <span>Entry strength</span><span style={{ color: strength.tone }}>{strength.pct}%</span>
+          </div>
+          <div style={{ height: 7, background: "rgba(255,255,255,.08)", borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ height: "100%", width: `${strength.pct}%`, background: strength.tone, transition: "width .3s" }} />
+          </div>
+        </div>
+        <button onClick={copy} style={btn("rgba(255,255,255,.06)")}>{copied ? "✓ Copied" : "Copy"}</button>
+        <button onClick={save} disabled={saving} style={btn(saved ? "#1DB954" : "#EC1C7B")}>
+          {saving ? "Saving…" : saved ? "✓ Saved to profile" : "Save to profile"}
+        </button>
+      </div>
+      {error && <Err msg={error} />}
+
+      <textarea readOnly value={narrative}
+        style={{ width: "100%", minHeight: 300, background: "rgba(0,0,0,.25)", border: "1px solid rgba(255,255,255,.12)", color: "rgba(255,255,255,.9)", padding: "1.1rem", fontFamily: "'Space Grotesk', sans-serif", fontSize: ".86rem", lineHeight: 1.65, borderRadius: 10, outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+
+      {existing.length > 0 && (
+        <p style={{ fontSize: ".78rem", color: "rgba(255,255,255,.4)", marginTop: ".8rem" }}>
+          You have <strong style={{ color: "rgba(255,255,255,.7)" }}>{existing.length}</strong> saved past-performance {existing.length === 1 ? "entry" : "entries"} on your profile.
+          Three strong ones is the usual ask.
+        </p>
+      )}
     </div>
   )
 }
