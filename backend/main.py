@@ -238,36 +238,6 @@ async def root():
         "persistence": "supabase" if supabase_enabled() else "in-memory (dev)",
     }
 
-@app.get("/api/debug/anthropic-key")
-async def _debug_anthropic_key():
-    """TEMPORARY diagnostic — reports the key FINGERPRINT only (never the key).
-    Remove after verifying prod config."""
-    k = os.environ.get("ANTHROPIC_API_KEY", "")
-    # Where could a competing value be coming from?
-    candidates = [".env", os.path.join(os.getcwd(), ".env"), "/etc/secrets/.env",
-                  "/etc/secrets/ANTHROPIC_API_KEY"]
-    found = {}
-    for p in candidates:
-        try:
-            if os.path.exists(p):
-                txt = open(p, "r", errors="replace").read().strip()
-                found[p] = {"exists": True, "content_prefix": txt[:14], "content_len": len(txt)}
-        except Exception as e:
-            found[p] = {"exists": True, "error": str(e)[:80]}
-    return {
-        "present": bool(k),
-        "length": len(k),
-        "prefix": k[:14],
-        "suffix": k[-4:] if len(k) > 8 else "",
-        "has_leading_or_trailing_space": k != k.strip(),
-        "has_quotes": k.startswith(('"', "'")) or k.endswith(('"', "'")),
-        "model": os.environ.get("ANTHROPIC_MODEL", "(default)"),
-        "on_render": bool(os.environ.get("RENDER")),
-        "cwd": os.getcwd(),
-        "dotenv_files_found": found or "none",
-    }
-
-
 @app.get("/api/health")
 async def health():
     return {"ok": True, "auth_enabled": auth_enabled(), "db": supabase_enabled()}
