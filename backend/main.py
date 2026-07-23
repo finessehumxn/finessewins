@@ -574,6 +574,27 @@ async def recompete_radar(
     }
 
 
+@app.get("/api/intel/primes")
+async def teaming_targets(
+    naics: str,
+    agency: Optional[str] = None,
+    user=Depends(optional_user),
+    _rl=Depends(intel_limit),
+):
+    """Who actually wins the work in this NAICS — i.e. who to approach about
+    subcontracting. Most first federal work is won as a sub, not a prime."""
+    if not naics or not naics.strip().isdigit():
+        raise HTTPException(400, "A numeric NAICS code is required.")
+    try:
+        import usaspending as _usa
+        data = await _usa.top_primes(naics.strip(), agency or None)
+    except Exception as e:
+        raise HTTPException(502, f"Award data unavailable: {type(e).__name__}: {str(e)[:200]}")
+    data["naics"] = naics.strip()
+    data["naics_name"] = naics_name(naics.strip())
+    return data
+
+
 # ── SAVED SEARCHES (Find Bids retention loop) ────────────────────
 
 class SavedSearchIn(BaseModel):

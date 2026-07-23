@@ -12,6 +12,8 @@ export default function Recompetes({ onNavigate }) {
   const [naics, setNaics] = useState("")
   const [months, setMonths] = useState(18)
   const [data, setData] = useState(null)
+  const [view, setView] = useState("expiring")
+  const [primes, setPrimes] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [myCodes, setMyCodes] = useState([])
@@ -34,6 +36,26 @@ export default function Recompetes({ onNavigate }) {
       const r = await apiJson(`/api/intel/recompetes?naics=${encodeURIComponent(c)}&months=${m}`)
       setData(r)
     } catch (e) { setError(e.message); setData(null) } finally { setLoading(false) }
+  }
+
+  const runPrimes = async (code = naics) => {
+    const c = String(code || "").trim()
+    if (!/^\d{2,6}$/.test(c)) { setError("Enter a NAICS code (2–6 digits)."); return }
+    setLoading(true); setError(null)
+    try {
+      const r = await apiJson(`/api/intel/primes?naics=${encodeURIComponent(c)}`)
+      setPrimes(r)
+    } catch (e) { setError(e.message); setPrimes(null) } finally { setLoading(false) }
+  }
+
+  const scan = (code = naics) => (view === "expiring" ? run(code) : runPrimes(code))
+
+  const switchView = (v) => {
+    setView(v)
+    const c = String(naics || "").trim()
+    if (!/^\d{2,6}$/.test(c)) return
+    if (v === "expiring" && !data) run(c)
+    if (v === "primes" && !primes) runPrimes(c)
   }
 
   const card = { background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12, padding: "1.5rem", marginBottom: "1.25rem" }
@@ -61,25 +83,36 @@ export default function Recompetes({ onNavigate }) {
         </p>
       </div>
 
+      <div style={{ display: "flex", gap: ".5rem", marginBottom: "1.25rem", flexWrap: "wrap" }}>
+        {[["expiring", "🔭 Expiring contracts"], ["primes", "🤝 Teaming targets"]].map(([v, l]) => (
+          <button key={v} onClick={() => switchView(v)}
+            style={{ padding: ".55rem 1.1rem", border: `2px solid ${view === v ? "#EC1C7B" : "rgba(255,255,255,.12)"}`, background: view === v ? "rgba(236,28,123,.1)" : "none", color: view === v ? "#fff" : "rgba(255,255,255,.55)", fontFamily: "'Space Grotesk', sans-serif", fontSize: ".84rem", fontWeight: view === v ? 600 : 400, cursor: "pointer", borderRadius: 8 }}>
+            {l}
+          </button>
+        ))}
+      </div>
+
       {error && <div style={{ background: "rgba(255,100,80,.1)", border: "1px solid rgba(255,100,80,.3)", borderRadius: 8, padding: ".8rem 1rem", marginBottom: "1rem", fontSize: ".85rem", color: "#FF8870" }}>{error}</div>}
 
       <div style={card}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 170px auto", gap: ".7rem", alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: view === "expiring" ? "1fr 170px auto" : "1fr auto", gap: ".7rem", alignItems: "end" }}>
           <div>
             <label style={{ display: "block", fontFamily: "'DM Mono', monospace", fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.5)", marginBottom: ".4rem" }}>NAICS code</label>
             <input style={{ ...input, width: "100%" }} value={naics} onChange={e => setNaics(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && run()} placeholder="e.g. 561720" />
+              onKeyDown={e => e.key === "Enter" && scan()} placeholder="e.g. 561720" />
           </div>
-          <div>
-            <label style={{ display: "block", fontFamily: "'DM Mono', monospace", fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.5)", marginBottom: ".4rem" }}>Expiring within</label>
-            <select style={{ ...input, width: "100%" }} value={months} onChange={e => { setMonths(+e.target.value); if (data) run(naics, +e.target.value) }}>
-              <option value={6}>6 months</option>
-              <option value={12}>12 months</option>
-              <option value={18}>18 months</option>
-              <option value={24}>24 months</option>
-            </select>
-          </div>
-          <button onClick={() => run()} disabled={loading}
+          {view === "expiring" && (
+            <div>
+              <label style={{ display: "block", fontFamily: "'DM Mono', monospace", fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: "rgba(255,255,255,.5)", marginBottom: ".4rem" }}>Expiring within</label>
+              <select style={{ ...input, width: "100%" }} value={months} onChange={e => { setMonths(+e.target.value); if (data) run(naics, +e.target.value) }}>
+                <option value={6}>6 months</option>
+                <option value={12}>12 months</option>
+                <option value={18}>18 months</option>
+                <option value={24}>24 months</option>
+              </select>
+            </div>
+          )}
+          <button onClick={() => scan()} disabled={loading}
             style={{ background: "#EC1C7B", color: "#fff", border: "none", padding: ".78rem 1.5rem", fontFamily: "'DM Mono', monospace", fontSize: ".68rem", letterSpacing: ".1em", textTransform: "uppercase", cursor: "pointer", borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}>
             {loading ? "Scanning…" : "Scan →"}
           </button>
@@ -89,14 +122,14 @@ export default function Recompetes({ onNavigate }) {
           <div style={{ display: "flex", gap: ".4rem", flexWrap: "wrap", marginTop: ".9rem", alignItems: "center" }}>
             <span style={{ fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.35)" }}>Your codes:</span>
             {myCodes.map(c => (
-              <button key={c} onClick={() => { setNaics(c); run(c) }}
+              <button key={c} onClick={() => { setNaics(c); scan(c) }}
                 style={{ background: naics === c ? "rgba(236,28,123,.15)" : "none", border: `1px solid ${naics === c ? "#EC1C7B" : "rgba(255,255,255,.15)"}`, color: naics === c ? "#fff" : "rgba(255,255,255,.5)", padding: ".25rem .7rem", borderRadius: 20, fontFamily: "'DM Mono', monospace", fontSize: ".62rem", cursor: "pointer" }}>{c}</button>
             ))}
           </div>
         )}
       </div>
 
-      {data && (
+      {view === "expiring" && data && (
         <>
           <div style={{ ...card, display: "flex", gap: "2rem", alignItems: "center", flexWrap: "wrap" }}>
             <div>
@@ -146,6 +179,69 @@ export default function Recompetes({ onNavigate }) {
               <li><strong style={{ color: "#fff" }}>6–9 months out</strong> — this is the window. Watch for the sources-sought notice and <em>respond to it</em>; that's how requirements get shaped and set-asides get justified.</li>
               <li><strong style={{ color: "#fff" }}>Under 3 months</strong> — the RFP is likely out or imminent. Run it through the <span style={{ color: "#1FB6EE", cursor: "pointer" }} onClick={() => onNavigate("rfp-shredder")}>RFP Shredder</span> the moment it drops.</li>
               <li>A large incumbent on a big award often means <strong style={{ color: "#fff" }}>subcontracting</strong> is the realistic first move — ask them, not the agency.</li>
+            </ul>
+          </div>
+        </>
+      )}
+      {view === "primes" && primes && (
+        <>
+          <div style={{ ...card, display: "flex", gap: "2rem", alignItems: "center", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "2.1rem", fontWeight: 900, color: "#1FB6EE", lineHeight: 1 }}>{primes.primes.length}</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".55rem", letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", marginTop: ".3rem" }}>Primes to approach</div>
+            </div>
+            <div style={{ borderLeft: "1px solid rgba(255,255,255,.1)", paddingLeft: "1.5rem" }}>
+              <div style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.5rem", fontWeight: 900, color: "#F8C81C", lineHeight: 1 }}>{money(primes.pool_total)}</div>
+              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".55rem", letterSpacing: ".14em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", marginTop: ".3rem" }}>Across {primes.sampled_awards} sampled awards</div>
+            </div>
+            <div style={{ borderLeft: "1px solid rgba(255,255,255,.1)", paddingLeft: "1.5rem", fontSize: ".85rem", color: "rgba(255,255,255,.6)", maxWidth: 320, lineHeight: 1.55 }}>
+              NAICS <strong style={{ color: "#fff" }}>{primes.naics}</strong>{primes.naics_name ? ` · ${primes.naics_name}` : ""} — who is actually winning this work.
+            </div>
+          </div>
+
+          <div style={{ background: "rgba(29,185,84,.07)", border: "1px solid rgba(29,185,84,.28)", borderRadius: 10, padding: "1rem 1.15rem", marginBottom: "1.25rem" }}>
+            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#1DB954", marginBottom: ".35rem" }}>Why this is your fastest first win</div>
+            <div style={{ fontSize: ".87rem", color: "rgba(255,255,255,.78)", lineHeight: 1.65 }}>
+              Most first federal work is won as a <strong style={{ color: "#fff" }}>subcontractor</strong>, not a prime — and it builds the past
+              performance that wins prime contracts later. Better still: primes holding contracts above{" "}
+              <strong style={{ color: "#fff" }}>{money(primes.threshold)}</strong> must carry a small-business subcontracting plan (FAR 19.702).
+              They have a standing obligation to find firms like yours. Rows marked <span style={{ color: "#1DB954" }}>SUB-K PLAN</span> almost
+              certainly do.
+            </div>
+          </div>
+
+          <div style={{ border: "1px solid rgba(255,255,255,.08)", borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 130px 120px", gap: "1rem", padding: ".75rem 1.25rem", background: "rgba(255,255,255,.03)", fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.4)" }}>
+              <span>Prime</span><span style={{ textAlign: "right" }}>Awards</span><span style={{ textAlign: "right" }}>Total won</span><span style={{ textAlign: "right" }}>Share</span>
+            </div>
+            {primes.primes.map((p, i) => (
+              <div key={p.name + i} style={{ display: "grid", gridTemplateColumns: "1fr 90px 130px 120px", gap: "1rem", padding: ".85rem 1.25rem", borderTop: i ? "1px solid rgba(255,255,255,.05)" : "none", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: ".88rem", fontWeight: 600 }}>
+                    {p.name}
+                    {p.subk_plan_likely && <span style={{ marginLeft: ".5rem", fontFamily: "'DM Mono', monospace", fontSize: ".5rem", letterSpacing: ".1em", color: "#1DB954", border: "1px solid rgba(29,185,84,.4)", borderRadius: 20, padding: ".1rem .45rem", verticalAlign: "middle" }}>SUB-K PLAN</span>}
+                  </div>
+                  {p.agencies?.length > 0 && <div style={{ fontSize: ".7rem", color: "rgba(255,255,255,.42)", marginTop: ".15rem" }}>{p.agencies.join(" · ")}</div>}
+                </div>
+                <div style={{ textAlign: "right", fontFamily: "'DM Mono', monospace", fontSize: ".8rem", color: "rgba(255,255,255,.7)" }}>{p.count}</div>
+                <div style={{ textAlign: "right", fontFamily: "'Unbounded', sans-serif", fontWeight: 700, fontSize: ".85rem", color: "#F8C81C" }}>{money(p.total)}</div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".75rem", color: "#1FB6EE" }}>{p.share_pct}%</div>
+                  <div style={{ height: 4, background: "rgba(255,255,255,.08)", borderRadius: 2, marginTop: ".25rem", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${Math.min(100, p.share_pct * 4)}%`, background: "#1FB6EE" }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ ...card, marginTop: "1.25rem" }}>
+            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".6rem", letterSpacing: ".12em", textTransform: "uppercase", color: "#1FB6EE", marginBottom: ".6rem" }}>How to approach them</div>
+            <ul style={{ listStyle: "none", display: "grid", gap: ".55rem", fontSize: ".87rem", color: "rgba(255,255,255,.72)", lineHeight: 1.55 }}>
+              <li>Ask for their <strong style={{ color: "#fff" }}>small business liaison officer</strong> — larger primes have one by name, and it is their job to take your call.</li>
+              <li>Lead with your <strong style={{ color: "#fff" }}>certifications and one specific capability</strong>, not a general introduction. They are filling a subcontracting plan, so say exactly which line you can fill.</li>
+              <li>Send your <span style={{ color: "#1FB6EE", cursor: "pointer" }} onClick={() => onNavigate("toolkit")}>capability statement</span> — one page, no attachments beyond it.</li>
+              <li>Cross-check the <span style={{ color: "#1FB6EE", cursor: "pointer" }} onClick={() => switchView("expiring")}>expiring contracts</span> tab: a prime with work ending soon is rebuilding their team right now.</li>
             </ul>
           </div>
         </>

@@ -236,3 +236,73 @@ async def expiring_awards(
         })
     out.sort(key=lambda r: r["days_left"])
     return out
+
+
+# ── TEAMING TARGETS ──────────────────────────────────────────────
+# Most first-time federal work is won as a SUBcontractor, not a prime.
+# Primes holding contracts over the FAR 19.702 threshold must carry a
+# small-business subcontracting plan — meaning they have a standing
+# obligation to find firms exactly like our user. This ranks who is
+# actually winning the work, so that outreach is aimed, not random.
+
+SUBK_PLAN_THRESHOLD = 750_000   # FAR 19.702 — plan required above this
+
+
+async def top_primes(
+    naics: str,
+    agency: Optional[str] = None,
+    pages: int = 3,
+    limit: int = 12,
+) -> dict:
+    """Rank the firms winning the most work in a NAICS (+ optional agency).
+
+    Returns each prime's award count, total dollars, average award size, share
+    of the sampled market, and whether their awards are typically large enough
+    to require a small-business subcontracting plan.
+    """
+    rows: List[dict] = []
+    for page in range(1, max(1, pages) + 1):
+        body = {
+            "filters": _filters(naics, agency, None),
+            "fields": ["Award ID", "Recipient Name", "Award Amount",
+                       "End Date", "Awarding Agency"],
+            "page": page, "limit": 100, "sort": "Award Amount", "order": "desc",
+        }
+        data = await _post_with_retry("/search/spending_by_award/", body)
+        res = (data or {}).get("results") or []
+        rows.extend(res)
+        if len(res) < 100:
+            break
+
+    agg: dict = {}
+    for a in rows:
+        name = (a.get("Recipient Name") or "Unknown").title()
+        amt = float(a.get("Award Amount") or 0)
+        rec = agg.setdefault(name, {
+            "name": name, "count": 0, "total": 0.0, "agencies": set(), "max_award": 0.0,
+        })
+        rec["count"] += 1
+        rec["total"] += amt
+        rec["max_award"] = max(rec["max_award"], amt)
+        if a.get("Awarding Agency"):
+            rec["agencies"].add(a["Awarding Agency"])
+
+    pool_total = sum(r["total"] for r in agg.values()) or 1.0
+    ranked = sorted(agg.values(), key=lambda r: r["total"], reverse=True)[:limit]
+    out = []
+    for r in ranked:
+        out.append({
+            "name": r["name"],
+            "count": r["count"],
+            "total": round(r["total"]),
+            "avg_award": round(r["total"] / max(1, r["count"])),
+            "share_pct": round(r["total"] / pool_total * 100, 1),
+            "agencies": sorted(r["agencies"])[:3],
+            "subk_plan_likely": r["max_award"] >= SUBK_PLAN_THRESHOLD,
+        })
+    return {
+        "primes": out,
+        "sampled_awards": len(rows),
+        "pool_total": round(pool_total),
+        "threshold": SUBK_PLAN_THRESHOLD,
+    }
