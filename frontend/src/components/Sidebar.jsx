@@ -24,14 +24,21 @@ const PLAN_LABELS = { free: "Free Trial", solo: "Solo", pro: "Pro", agency: "Age
 export default function Sidebar({ currentPage, onNavigate, userEmail, onSignOut }) {
   const [usage, setUsage] = useState(null)
   const [unseenAlerts, setUnseenAlerts] = useState(0)
+  const [profile, setProfile] = useState(null)
 
   // Refetch usage + unseen alert count when the page changes.
   useEffect(() => {
     let alive = true
     apiJson("/api/usage").then(u => { if (alive) setUsage(u) }).catch(() => {})
     apiJson("/api/alerts/settings").then(s => { if (alive) setUnseenAlerts(s.unseen || 0) }).catch(() => {})
+    apiJson("/api/profile").then(({ profile: p }) => { if (alive) setProfile(p || null) }).catch(() => {})
     return () => { alive = false }
   }, [currentPage])
+
+  const myCerts = Array.isArray(profile?.certifications) ? profile.certifications.filter(Boolean) : []
+  const company = profile?.name || ""
+  const cage = profile?.cage || ""
+  const uei = profile?.uei || ""
 
   const planName = PLAN_LABELS[usage?.plan] || "Free Trial"
   const unlimited = usage ? usage.limit >= 999 : false
@@ -52,11 +59,13 @@ export default function Sidebar({ currentPage, onNavigate, userEmail, onSignOut 
           <div style={{ fontFamily: "'Unbounded', sans-serif", fontSize: "1.2rem", fontWeight: 900, letterSpacing: "-.03em", color: "#fff" }}>Finesse<span style={{ color: "#EC1C7B" }}>Wins</span></div>
         </div>
         <div style={{ fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".15em", textTransform: "uppercase", color: "rgba(255,255,255,.3)", marginTop: ".45rem" }}>AI · Gov Contracting</div>
-        <div style={{ marginTop: ".6rem", display: "flex", gap: ".35rem", flexWrap: "wrap" }}>
-          {["WOSB", "MBE", "Black-Owned"].map(c => (
-            <span key={c} style={{ fontFamily: "'DM Mono', monospace", fontSize: ".52rem", letterSpacing: ".08em", background: "rgba(31,182,238,.1)", color: "#1FB6EE", border: "1px solid rgba(31,182,238,.2)", padding: ".15rem .5rem", borderRadius: 3 }}>{c}</span>
-          ))}
-        </div>
+        {myCerts.length > 0 && (
+          <div style={{ marginTop: ".6rem", display: "flex", gap: ".35rem", flexWrap: "wrap" }}>
+            {myCerts.slice(0, 4).map(c => (
+              <span key={c} style={{ fontFamily: "'DM Mono', monospace", fontSize: ".52rem", letterSpacing: ".08em", background: "rgba(31,182,238,.1)", color: "#1FB6EE", border: "1px solid rgba(31,182,238,.2)", padding: ".15rem .5rem", borderRadius: 3 }}>{c}</span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Nav */}
@@ -135,11 +144,13 @@ export default function Sidebar({ currentPage, onNavigate, userEmail, onSignOut 
         </div>
       )}
 
-      {/* MC Brand footer */}
-      <div style={{ padding: ".75rem 1.5rem", borderTop: "1px solid rgba(255,255,255,.06)", fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".1em", color: "rgba(255,255,255,.2)", textTransform: "uppercase", lineHeight: 1.7 }}>
-        Millennials Creatives LLC<br />
-        CAGE 18ZQ0 · SAM Registered
-      </div>
+      {/* Company footer — the signed-in user's own business */}
+      {(company || cage) && (
+        <div style={{ padding: ".75rem 1.5rem", borderTop: "1px solid rgba(255,255,255,.06)", fontFamily: "'DM Mono', monospace", fontSize: ".58rem", letterSpacing: ".1em", color: "rgba(255,255,255,.2)", textTransform: "uppercase", lineHeight: 1.7 }}>
+          {company || "Your Company"}<br />
+          {cage ? `CAGE ${cage} · ` : ""}{uei ? "SAM Registered" : "SAM pending"}
+        </div>
+      )}
     </aside>
   )
 }
