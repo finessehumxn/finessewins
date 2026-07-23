@@ -9,6 +9,7 @@ import BidIQ from "./pages/BidIQ"
 import Toolkit from "./pages/Toolkit"
 import GetRegistered from "./pages/GetRegistered"
 import RfpShredder from "./pages/RfpShredder"
+import Recompetes from "./pages/Recompetes"
 import Profile from "./pages/Profile"
 import Pricing from "./pages/Pricing"
 import Login from "./pages/Login"
@@ -76,6 +77,7 @@ export default function App() {
           {page === "toolkit"      && <Toolkit onNavigate={navigate} />}
           {page === "rfp-shredder" && <RfpShredder onNavigate={navigate} />}
           {page === "get-registered" && <GetRegistered onNavigate={navigate} />}
+          {page === "recompetes"  && <Recompetes onNavigate={navigate} />}
           {page === "pricing"      && <Pricing onNavigate={navigate} />}
           {page === "profile"      && <Profile onNavigate={navigate} />}
         </ErrorBoundary>

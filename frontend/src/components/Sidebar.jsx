@@ -13,6 +13,7 @@ const NAV = [
   { id: "toolkit",       label: "Toolkit",          icon: "🧰", group: "Win the bid" },
   { id: "opportunities", label: "Find Bids",        icon: "🔍", group: "Find the bid" },
   { id: "alerts",        label: "Bid Radar",        icon: "📡", group: "Find the bid" },
+  { id: "recompetes",    label: "Recompete Radar",  icon: "🔭", group: "Find the bid" },
   { id: "advisor",       label: "Advisor Console",  icon: "🏛", group: "For advisors" },
   { id: "pricing",       label: "Pricing",          icon: "💳", group: "Account" },
   { id: "profile",       label: "Company Profile",  icon: "◎",  group: "Account" },

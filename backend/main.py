@@ -573,6 +573,37 @@ async def rfp_export_matrix(req: MatrixExport, user=Depends(optional_user)):
         headers={"Content-Disposition": f'attachment; filename="{name}_Compliance_Matrix.docx"'},
     )
 
+# ── RECOMPETE RADAR ──────────────────────────────────────────────
+
+@app.get("/api/intel/recompetes")
+async def recompete_radar(
+    naics: str,
+    agency: Optional[str] = None,
+    months: int = 18,
+    user=Depends(optional_user),
+    _rl=Depends(intel_limit),
+):
+    """Contracts in a NAICS whose period of performance ends soon — the
+    recompete pipeline. Winning starts 6-12 months before the RFP drops."""
+    if not naics or not naics.strip().isdigit():
+        raise HTTPException(400, "A numeric NAICS code is required.")
+    months = max(1, min(int(months or 18), 36))
+    try:
+        import usaspending as _usa
+        rows = await _usa.expiring_awards(naics.strip(), agency or None, within_days=months * 30)
+    except Exception as e:
+        raise HTTPException(502, f"Award data unavailable: {type(e).__name__}: {str(e)[:200]}")
+    total = sum(r["amount"] for r in rows)
+    return {
+        "naics": naics.strip(),
+        "naics_name": naics_name(naics.strip()),
+        "months": months,
+        "count": len(rows),
+        "total_value": total,
+        "recompetes": rows[:200],
+    }
+
+
 # ── SAVED SEARCHES (Find Bids retention loop) ────────────────────
 
 class SavedSearchIn(BaseModel):

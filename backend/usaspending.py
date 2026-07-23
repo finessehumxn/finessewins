@@ -91,7 +91,7 @@ async def award_search(
         "filters": _filters(naics, agency, set_aside_codes),
         "fields": ["Award ID", "Recipient Name", "Award Amount",
                    "Awarding Agency", "Awarding Sub Agency",
-                   "Period of Performance Current End Date", "recipient_id"],
+                   "Start Date", "End Date", "recipient_id"],
         "page": max(1, page), "limit": min(limit, 100),
         "sort": "Award Amount", "order": "desc",
     }
@@ -179,3 +179,60 @@ def top_recipients(awards: List[dict], n: int = 5) -> List[dict]:
         rec["total"] += float(a.get("Award Amount") or 0)
     ranked = sorted(agg.values(), key=lambda r: (r["count"], r["total"]), reverse=True)
     return ranked[:n]
+
+
+# ── RECOMPETE RADAR ──────────────────────────────────────────────
+# Contracts are won 6-12 months before the RFP is published, by whoever
+# already knows the incumbent's contract is ending. This surfaces that
+# pipeline from real award data.
+
+async def expiring_awards(
+    naics: str,
+    agency: Optional[str] = None,
+    within_days: int = 540,
+    pages: int = 3,
+) -> List[dict]:
+    """Active contracts in a NAICS whose period of performance ends soon.
+
+    Returns soonest-first, each with the incumbent, the agency, the dollar
+    value and days remaining — i.e. who to displace and when to start.
+    """
+    rows: List[dict] = []
+    for page in range(1, max(1, pages) + 1):
+        body = {
+            "filters": _filters(naics, agency, None),
+            "fields": ["Award ID", "Recipient Name", "Award Amount",
+                       "Start Date", "End Date", "Awarding Agency", "Awarding Sub Agency"],
+            "page": page, "limit": 100, "sort": "Award Amount", "order": "desc",
+        }
+        data = await _post_with_retry("/search/spending_by_award/", body)
+        res = (data or {}).get("results") or []
+        rows.extend(res)
+        if len(res) < 100:
+            break
+
+    now = datetime.utcnow()
+    out: List[dict] = []
+    for a in rows:
+        raw = a.get("End Date")
+        if not raw:
+            continue
+        try:
+            end = datetime.strptime(str(raw)[:10], "%Y-%m-%d")
+        except Exception:
+            continue
+        days = (end - now).days
+        if days < 0 or days > within_days:
+            continue
+        out.append({
+            "award_id": a.get("Award ID"),
+            "incumbent": (a.get("Recipient Name") or "Unknown").title(),
+            "agency": a.get("Awarding Agency") or "",
+            "sub_agency": a.get("Awarding Sub Agency") or "",
+            "amount": float(a.get("Award Amount") or 0),
+            "start_date": (str(a.get("Start Date"))[:10] if a.get("Start Date") else None),
+            "end_date": str(raw)[:10],
+            "days_left": days,
+        })
+    out.sort(key=lambda r: r["days_left"])
+    return out
